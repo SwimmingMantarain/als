@@ -29,7 +29,7 @@ pub fn main() anyerror!void {
     defer lua.deinit();
     lua.openLibs(); // load standard library
 
-    var context = try Context.init(allocator, display);
+    var context = try Context.init(allocator, display, lua);
     defer context.deinit();
 
     lapi.init(lua, &context); // Register my API
@@ -52,26 +52,10 @@ pub fn main() anyerror!void {
         return error.ConfigLoadFailed;
     };
 
-
-    const shm = context.shm orelse return error.NoWlShm;
-    const compositor = context.compositor orelse return error.NoWlCompositor;
-    const layer_shell = context.layer_shell orelse return error.NoZwlrLayerShell;
-    const outputs = context.outputs;
-
-    for (outputs.items) |info| {
-        const w = try window.Window.init(
-            "als-window",
-            128, 256,
-            500, 600,
-            display, compositor, shm, layer_shell,
-            info.output
-        );
-
-        try context.windows.append(allocator, w);
-    }
-
-    var counter: i32 = 0;
-    var removed: bool = false;
+    //const shm = context.shm orelse return error.NoWlShm;
+    //const compositor = context.compositor orelse return error.NoWlCompositor;
+    //const layer_shell = context.layer_shell orelse return error.NoZwlrLayerShell;
+    //const outputs = context.outputs;
 
     while (true) {
         if (display.dispatch() != .SUCCESS) return error.DispatchFailed;
@@ -79,24 +63,6 @@ pub fn main() anyerror!void {
         for (context.windows.items) |*w| {
             try w.update(display);
         }
-
-        if (counter >= 60 and removed == false) { // Roughly 10 sec
-            var w = context.windows.items[0];
-
-            // Shift items left to preserve order
-            for (0..context.windows.items.len - 1) |i| {
-                context.windows.items[i] = context.windows.items[i + 1];
-            }
-
-            context.windows.items.len -= 1;
-
-            // Delete the w
-            w.deinit();
-
-            removed = true;
-        }
-
-        counter += 1;
 
         std.Thread.sleep(16_000_000); // ~60fps (16ms)
     }
@@ -183,6 +149,22 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) v
             const time = button.time;
             const btn = button.button;
             const state = button.state;
+
+            if (btn == 272 and state == .pressed) { // Left click and pressed
+                const active_window = context.active_window;
+                if (active_window.?.callbacks.click != null) {
+                    _ = context.lua.rawGetIndex(zlua.registry_index, active_window.?.callbacks.click.?);
+
+                    context.lua.protectedCall(.{}) catch |err| {
+                        std.debug.print("Lua callback error: {}\n", .{err});
+                        if (context.lua.isString(-1)) {
+                            const err_msg = context.lua.toString(-1) catch "unknown";
+                            std.debug.print("Error message: {s}\n", .{err_msg});
+                        }
+                        context.lua.pop(1);
+                    };
+                }
+            }
 
             std.debug.print("Time: {}, Button: {}, State: {}\n", .{ time, btn, state });
         },

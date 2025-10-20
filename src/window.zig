@@ -14,14 +14,25 @@ pub const OutputInfo = struct {
     ready: bool = false,
 };
 
+pub const WindowBuffer = struct {
+    buffer: *wl.Buffer,
+    pixels: [*]u32,
+    pixel_count: usize,
+};
+
+pub const Callbacks = struct {
+    click: ?i32,
+};
+
 pub const Window = struct {
     surface: *wl.Surface,
     layer_surface: *zwlr.LayerSurfaceV1,
-    buffer: *wl.Buffer,
+    wBuffer: WindowBuffer,
     x: i32,
     y: i32,
     width: u64,
     height: u64,
+    callbacks: Callbacks,
 
     pub fn init(
         window_name: []const u8,
@@ -35,7 +46,7 @@ pub const Window = struct {
         layer_shell: *zwlr.LayerShellV1,
         output: *wl.Output,
     ) !Window {
-        const buffer = blk: {
+        const wBuffer = blk: {
             const stride = width * 4;
             const size = stride * height;
 
@@ -58,14 +69,20 @@ pub const Window = struct {
             const pool = try shm.createPool(fd, @as(i32, @intCast(size)));
             defer pool.destroy();
 
-            break :blk try pool.createBuffer(
+            const buffer = try pool.createBuffer(
                        0,
                        @as(i32, @intCast(width)),
                        @as(i32, @intCast(height)),
                        @as(i32, @intCast(stride)),
                        wl.Shm.Format.argb8888
                    );
-               };
+
+            break :blk WindowBuffer{
+                .buffer = buffer,
+                .pixels = pixels,
+                .pixel_count = pixel_count,
+            };
+        };
 
         const surface = try compositor.createSurface();
         
@@ -99,24 +116,29 @@ pub const Window = struct {
             if (display.dispatch() != .SUCCESS) return error.DispatchFailed;
         }
 
-        surface.attach(buffer, 0, 0);
+        surface.attach(wBuffer.buffer, 0, 0);
         surface.commit();
+
+        const callbacks = Callbacks{
+            .click = null,
+        };
 
         return Window{
             .surface = surface,
             .layer_surface = layer_surface,
-            .buffer = buffer,
+            .wBuffer = wBuffer,
             .x = x,
             .y = y,
             .width = width,
             .height = height,
+            .callbacks = callbacks,
         };
     }
 
     pub fn deinit(self: *Window) void {
         self.layer_surface.destroy();
         self.surface.destroy();
-        self.buffer.destroy();
+        self.wBuffer.buffer.destroy();
     }
 
     pub fn update(_: *Window, display: *wl.Display) anyerror!void {

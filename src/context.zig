@@ -6,6 +6,7 @@ const wl = wayland.client.wl;
 const xdg = wayland.client.xdg;
 const zwlr = wayland.client.zwlr;
 const seat = wayland.client.seat;
+const zlua = @import("zlua");
 
 const window = @import("./window.zig");
 
@@ -20,8 +21,9 @@ pub const Context = struct {
     pointer: ?*wl.Pointer,
     windows: std.ArrayList(window.Window),
     active_window: ?*window.Window,
+    lua: *zlua.Lua,
 
-    pub fn init(gpa: Allocator, display: *wl.Display) !Context {
+    pub fn init(gpa: Allocator, display: *wl.Display, lua: *zlua.Lua) !Context {
         const context = Context{
             .display = display,
             .shm = null,
@@ -33,6 +35,7 @@ pub const Context = struct {
             .pointer = null,
             .windows = try .initCapacity(gpa, 5),
             .active_window = null,
+            .lua = lua,
         };
         
         return context;
