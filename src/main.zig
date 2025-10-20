@@ -155,7 +155,19 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) v
                 if (active_window.?.callbacks.click != null) {
                     _ = context.lua.rawGetIndex(zlua.registry_index, active_window.?.callbacks.click.?);
 
-                    context.lua.protectedCall(.{}) catch |err| {
+                    const userdata_ptr = context.lua.newUserdata(*window.Window, 0);
+                    userdata_ptr.* = active_window.?;
+
+                    _ = context.lua.getMetatableRegistry("Window");
+                    context.lua.setMetatable(-2);
+
+                    const args = zlua.Lua.ProtectedCallArgs {
+                        .args = 1, // One argument
+                        .results = 0,
+                        .msg_handler = 0,
+                    };
+
+                    context.lua.protectedCall(args) catch |err| {
                         std.debug.print("Lua callback error: {}\n", .{err});
                         if (context.lua.isString(-1)) {
                             const err_msg = context.lua.toString(-1) catch "unknown";

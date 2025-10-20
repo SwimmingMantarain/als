@@ -31,6 +31,9 @@ fn createWindowMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaSetCallback));
     L.setField(-2, "set_callback");
 
+    L.pushFunction(zlua.wrap(luaSetWindowColor));
+    L.setField(-2, "set_color");
+
     L.setField(-2, "__index");
 
     L.pop(1);
@@ -73,6 +76,20 @@ fn luaSetCallback(L: *Lua) i32 {
         L.raiseErrorStr("Unknown callback type", .{});
         return 0;
     }
+
+    return 0;
+}
+
+fn luaSetWindowColor(L: *Lua) i32 {
+    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
+    const window_ptr = window_ptr_ptr.*;
+
+    const color = L.toInteger(2) catch {
+        L.raiseErrorStr("Expected Integer/Hexadecimal value (0xFFFFFFFF, 0xARGB)", .{});
+        return 0;
+    };
+
+    window_ptr.setColor(@as(u32, @intCast(color)));
 
     return 0;
 }

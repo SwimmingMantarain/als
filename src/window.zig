@@ -144,6 +144,14 @@ pub const Window = struct {
     pub fn update(_: *Window, display: *wl.Display) anyerror!void {
         if (display.flush() != .SUCCESS) return error.FlushFailed;
     }
+
+    pub fn setColor(self: *Window, color: u32) void {
+        const pixels = self.wBuffer.pixels;
+        const pixel_count = self.wBuffer.pixel_count;
+        @memset(pixels[0..pixel_count], color); // ARGB
+        self.surface.attach(self.wBuffer.buffer, 0, 0);
+        self.surface.commit();
+    }
 };
 
 fn layerSurfaceListener(layer_surface: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV1.Event, configured: *bool) void {
