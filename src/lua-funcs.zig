@@ -66,13 +66,23 @@ fn luaSetCallback(L: *Lua) i32 {
         return 0;
     };
 
-    if (std.mem.eql(u8, callback_type, "click")) {
-        if (window_ptr.callbacks.click) |old_ref| {
-            L.unref(zlua.registry_index, old_ref);
-        }
+    const callbacks_type = @typeInfo(window.Callbacks).@"struct";
+    var callback_found = false;
 
-        window_ptr.callbacks.click = ref;
-    } else {
+    inline for (callbacks_type.fields) |field| {
+        if (std.mem.eql(u8, callback_type, field.name)) {
+            if (@field(window_ptr.callbacks, field.name)) |old_ref| {
+                L.unref(zlua.registry_index, old_ref);
+            }
+
+            @field(window_ptr.callbacks, field.name) = ref;
+            callback_found = true;
+            break;
+        }
+    }
+
+    if (!callback_found) {
+        L.unref(zlua.registry_index, ref);
         L.raiseErrorStr("Unknown callback type", .{});
         return 0;
     }

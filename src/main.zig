@@ -17,6 +17,8 @@ const zlua = @import("zlua");
 const Lua = zlua.Lua;
 const lapi = @import("./lua-funcs.zig");
 
+const pointerListener = @import("./pointer.zig").pointerListener;
+
 pub fn main() anyerror!void {
     const display = try wl.Display.connect(null);
     const registry = try display.getRegistry();
@@ -117,69 +119,5 @@ fn seatListener(seat_: *wl.Seat, event: wl.Seat.Event, context: *Context) void {
             }
         },
         .name => {},
-    }
-}
-
-fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) void {
-    switch (event) {
-        .enter => |enter| {
-            for (context.windows.items) |*w| {
-                if (w.surface == enter.surface) {
-                    context.active_window = w;
-                    std.debug.print("Entered window at x: {}, y: {}\n", .{ enter.surface_x, enter.surface_y });
-                    break;
-                }
-            }
-        },
-        .leave => {
-            for (context.windows.items) |w| {
-                if (w.surface == context.active_window.?.surface) {
-                    context.active_window = null;
-                    std.debug.print("Left", .{});
-                    break;
-                }
-            }
-        },
-        .motion => |motion| {
-            if (context.active_window) |w| {
-                std.debug.print("Motion on window ({}): x: {}, y: {}\n", .{ w.surface, motion.surface_x, motion.surface_y });
-            }
-        },
-        .button => |button| {
-            const time = button.time;
-            const btn = button.button;
-            const state = button.state;
-
-            if (btn == 272 and state == .pressed) { // Left click and pressed
-                const active_window = context.active_window;
-                if (active_window.?.callbacks.click != null) {
-                    _ = context.lua.rawGetIndex(zlua.registry_index, active_window.?.callbacks.click.?);
-
-                    const userdata_ptr = context.lua.newUserdata(*window.Window, 0);
-                    userdata_ptr.* = active_window.?;
-
-                    _ = context.lua.getMetatableRegistry("Window");
-                    context.lua.setMetatable(-2);
-
-                    const args = zlua.Lua.ProtectedCallArgs {
-                        .args = 1, // One argument
-                        .results = 0,
-                        .msg_handler = 0,
-                    };
-
-                    context.lua.protectedCall(args) catch |err| {
-                        std.debug.print("Lua callback error: {}\n", .{err});
-                        if (context.lua.isString(-1)) {
-                            const err_msg = context.lua.toString(-1) catch "unknown";
-                            std.debug.print("Error message: {s}\n", .{err_msg});
-                        }
-                        context.lua.pop(1);
-                    };
-                }
-            }
-
-            std.debug.print("Time: {}, Button: {}, State: {}\n", .{ time, btn, state });
-        },
-        else => {},
     }
 }

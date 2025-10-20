@@ -21,7 +21,11 @@ pub const WindowBuffer = struct {
 };
 
 pub const Callbacks = struct {
-    click: ?i32,
+    leftpress: ?i32,
+    leftrelease: ?i32,
+    mouseenter: ?i32,
+    mouseleave: ?i32,
+    mousemotion: ?i32,
 };
 
 pub const Window = struct {
@@ -120,7 +124,11 @@ pub const Window = struct {
         surface.commit();
 
         const callbacks = Callbacks{
-            .click = null,
+            .leftpress = null,
+            .leftrelease = null,
+            .mouseenter = null,
+            .mouseleave = null,
+            .mousemotion = null,
         };
 
         return Window{
