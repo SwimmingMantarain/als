@@ -21,7 +21,7 @@ function Leave(window)
 end
 
 function Key(window)
-    window:set_color(0x000000)
+    window:set_color(0xFF000000)
 end
 
 Window1:set_callback("leftpress", Leftpress)

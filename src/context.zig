@@ -10,6 +10,10 @@ const zlua = @import("zlua");
 
 const window = @import("./window.zig");
 
+const xkb = @cImport({
+    @cInclude("xkbcommon/xkbcommon.h");
+});
+
 pub const Context = struct {
     display: *wl.Display,
     shm: ?*wl.Shm,
@@ -24,7 +28,17 @@ pub const Context = struct {
     active_window: ?*window.Window,
     lua: *zlua.Lua,
 
+    // xkb shenanigans
+    xkb_context: ?*xkb.xkb_context,
+    xkb_keymap: ?*xkb.xkb_keymap,
+    xkb_state: ?*xkb.xkb_state,
+
     pub fn init(gpa: Allocator, display: *wl.Display, lua: *zlua.Lua) !Context {
+        const xkb_context = xkb.xkb_context_new(xkb.XKB_CONTEXT_NO_FLAGS);
+        if (xkb_context == null) {
+            return error.XkbContextFailed;
+        }
+
         const context = Context{
             .display = display,
             .shm = null,
@@ -38,12 +52,25 @@ pub const Context = struct {
             .windows = try .initCapacity(gpa, 5),
             .active_window = null,
             .lua = lua,
+            .xkb_context = xkb_context,
+            .xkb_keymap = null,
+            .xkb_state = null,
         };
         
         return context;
     }
 
     pub fn deinit(self: *Context) void {
+        if (self.xkb_state) |state| {
+            xkb.xkb_state_unref(state);
+        }
+        if (self.xkb_keymap) |keymap| {
+            xkb.xkb_keymap_unref(keymap);
+        }
+        if (self.xkb_context) |ctx| {
+            xkb.xkb_context_unref(ctx);
+        }
+
         self.outputs.deinit(self.allocator);
         self.windows.deinit(self.allocator);
     }

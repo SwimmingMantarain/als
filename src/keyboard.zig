@@ -14,12 +14,16 @@ const Context = @import("./context.zig").Context;
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
 
+const xkb = @cImport({
+    @cInclude("xkbcommon/xkbcommon.h");
+});
+
 pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Context) void {
     switch (event) {
-        .key => {
+        .key => |key| {
             if (context.active_window) |active_window| {
                 if (active_window.callbacks.key) |callback| {
-                    std.debug.print("Key!\n", .{});
+                    std.debug.print("Key: {}, State: {}\n", .{ key.key, key.state });
                     handleCallback(active_window, callback, context);
                 }
             }

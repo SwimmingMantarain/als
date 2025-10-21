@@ -37,6 +37,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("zlua", lua_dep.module("zlua"));
     exe.linkLibC();
     exe.linkSystemLibrary("wayland-client");
+    exe.linkSystemLibrary("xkbcommon");
 
     b.installArtifact(exe);
 }
