@@ -27,30 +27,32 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
             for (context.windows.items) |*w| {
                 if (w.surface == enter.surface) {
                     context.active_window = w;
-                    if (w.callbacks.mouseenter != null) {
-                        handleCallback(w, w.callbacks.mouseenter, context);
+                    if (w.callbacks.mouseenter) |callback| {
+                        handleCallback(w, callback, context);
                     }
                     break;
                 }
             }
         },
-        .leave => {
-            if (context.active_window) |active_window| {
-                for (context.windows.items) |w| {
-                    if (w.surface == active_window.surface) {
-                        context.active_window = null;
-                        if (active_window.callbacks.mouseleave != null) {
-                            handleCallback(active_window, active_window.callbacks.mouseleave, context);
+        .leave => |leave| {
+            for (context.windows.items) |*w| {
+                if (w.surface == leave.surface) {
+                    if (context.active_window) |active| {
+                        if (active.surface == leave.surface) {
+                            context.active_window = null;
                         }
-                        break;
                     }
+                    if (w.callbacks.mouseleave) |callback| {
+                        handleCallback(w, callback, context);
+                    }
+                    break;
                 }
             }
         },
         .motion => {
             if (context.active_window) |active_window| {
-                if (active_window.callbacks.mousemotion != null) {
-                    handleCallback(active_window, active_window.callbacks.mousemotion, context);
+                if (active_window.callbacks.mousemotion) |callback| {
+                    handleCallback(active_window, callback, context);
                 }
             }
         },
@@ -60,12 +62,12 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                 const state = button.state;
 
                 if (btn == 272 and state == .pressed) { // Left click and pressed
-                    if (active_window.callbacks.leftpress != null) {
-                        handleCallback(active_window, active_window.callbacks.leftpress, context);
+                    if (active_window.callbacks.leftpress) |callback| {
+                        handleCallback(active_window, callback, context);
                     }
                 } else if (btn == 272 and state == .released) { // Left click and released
-                    if (active_window.callbacks.leftrelease != null) {
-                        handleCallback(active_window, active_window.callbacks.leftrelease, context);
+                    if (active_window.callbacks.leftrelease) |callback| {
+                        handleCallback(active_window, callback, context);
                     }
                 }
             }
@@ -74,8 +76,8 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
     }
 }
 
-fn handleCallback(active_window: *window.Window, callback: ?i32, context: *Context) void {
-    _ = context.lua.rawGetIndex(zlua.registry_index, callback.?);
+fn handleCallback(active_window: *window.Window, callback: i32, context: *Context) void {
+    _ = context.lua.rawGetIndex(zlua.registry_index, callback);
 
     const userdata_ptr = context.lua.newUserdata(*window.Window, 0);
     userdata_ptr.* = active_window;

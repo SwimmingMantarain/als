@@ -18,6 +18,7 @@ const Lua = zlua.Lua;
 const lapi = @import("./lua-funcs.zig");
 
 const pointerListener = @import("./pointer.zig").pointerListener;
+const keyboardListener = @import("./keyboard.zig").keyboardListener;
 
 pub fn main() anyerror!void {
     const display = try wl.Display.connect(null);
@@ -53,11 +54,6 @@ pub fn main() anyerror!void {
 
         return error.ConfigLoadFailed;
     };
-
-    //const shm = context.shm orelse return error.NoWlShm;
-    //const compositor = context.compositor orelse return error.NoWlCompositor;
-    //const layer_shell = context.layer_shell orelse return error.NoZwlrLayerShell;
-    //const outputs = context.outputs;
 
     while (true) {
         if (display.dispatch() != .SUCCESS) return error.DispatchFailed;
@@ -112,10 +108,14 @@ fn outputListener(_: *wl.Output, event: wl.Output.Event, info: *OutputInfo) void
 fn seatListener(seat_: *wl.Seat, event: wl.Seat.Event, context: *Context) void {
     switch (event) {
         .capabilities => |caps| {
-            // Check for Pointer
-            if (caps.capabilities.pointer) {
+            if (caps.capabilities.pointer) { // Check for pointer
                 context.pointer = seat_.getPointer() catch return;
                 context.pointer.?.setListener(*Context, pointerListener, context);
+            }
+
+            if (caps.capabilities.keyboard) { // Check for keyboard
+                context.keyboard = seat_.getKeyboard() catch return;
+                context.keyboard.?.setListener(*Context, keyboardListener, context);
             }
         },
         .name => {},

@@ -20,10 +20,15 @@ function Leave(window)
     window:set_color(0xFF0000FF)
 end
 
+function Key(window)
+    window:set_color(0x000000)
+end
+
 Window1:set_callback("leftpress", Leftpress)
 Window1:set_callback("leftrelease", Leftrelease)
 Window1:set_callback("mousemotion", Motion)
 Window1:set_callback("mouseenter", Enter)
 Window1:set_callback("mouseleave", Leave)
+Window1:set_callback("key", Key)
 
 print("Created Window: ", Window1)

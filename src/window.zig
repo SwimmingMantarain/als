@@ -26,6 +26,7 @@ pub const Callbacks = struct {
     mouseenter: ?i32,
     mouseleave: ?i32,
     mousemotion: ?i32,
+    key: ?i32,
 };
 
 pub const Window = struct {
@@ -109,7 +110,6 @@ pub const Window = struct {
         });
 
         layer_surface.setKeyboardInteractivity(.on_demand);
-
         layer_surface.setMargin(0, 0, y, x); // top right bottom left
 
         var configured = false;
@@ -129,6 +129,7 @@ pub const Window = struct {
             .mouseenter = null,
             .mouseleave = null,
             .mousemotion = null,
+            .key = null,
         };
 
         return Window{
