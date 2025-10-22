@@ -25,6 +25,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
     switch (event) {
         .enter => |enter| {
             for (context.windows.items) |*w| {
+                std.debug.print("Window: {}, 
                 if (w.surface == enter.surface) {
                     context.active_window = w;
                     if (w.callbacks.mouseenter) |callback| {
