@@ -1,4 +1,4 @@
-Window1 = als.create_window(200, 200, 0, 0)
+Window1 = als.create_window(200, 200, 0, 0, true)
 
 function Leftpress(window)
     window:set_color(0xFFFF0000) -- ARGB

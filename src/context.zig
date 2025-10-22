@@ -10,7 +10,7 @@ const zlua = @import("zlua");
 
 const window = @import("./window.zig");
 
-const xkb = @cImport({
+pub const xkb = @cImport({
     @cInclude("xkbcommon/xkbcommon.h");
 });
 

@@ -162,9 +162,11 @@ pub const Window = struct {
     }
 
     pub fn deinit(self: *Window) void {
-        self.layer_surface.destroy();
-        self.surface.destroy();
-        self.wBuffer.buffer.destroy();
+        for (self.monitors.items) |*monitor| {
+            monitor.layer_surface.destroy();
+            monitor.surface.destroy();
+            monitor.buffer.buffer.destroy();
+        }
     }
 
     pub fn update(_: *Window, display: *wl.Display) anyerror!void {
