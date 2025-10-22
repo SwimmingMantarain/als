@@ -173,6 +173,10 @@ pub const Window = struct {
         if (display.flush() != .SUCCESS) return error.FlushFailed;
     }
 
+    pub fn drawText(_: *Window, x: i32, y: i32, text: []const u8, font: []const u8, size: i32) void {
+        std.debug.print("{}, {}, {s}, {s}, {}", .{ x, y, text, font, size });
+    }
+
     pub fn setPos(self: *Window, x: i32, y: i32) void {
         for (self.monitors.items) |*monitor| {
             if (monitor == self.context.active_monitor) {

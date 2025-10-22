@@ -14,6 +14,16 @@ pub const xkb = @cImport({
     @cInclude("xkbcommon/xkbcommon.h");
 });
 
+pub const ft = @cImport({
+    @cInclude("ft2build.h");
+    @cInclude("freetype/freetype.h");
+});
+
+pub const hb = @cImport({
+    @cInclude("hb.h");
+    @cInclude("hb-ft.h");
+});
+
 pub const Context = struct {
     display: *wl.Display,
     shm: ?*wl.Shm,

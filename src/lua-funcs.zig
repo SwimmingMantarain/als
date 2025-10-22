@@ -37,6 +37,9 @@ fn createWindowMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaSetWindowPos));
     L.setField(-2, "set_position");
 
+    L.pushFunction(zlua.wrap(luaDrawTextToWindow));
+    L.setField(-2, "draw_text");
+
     L.setField(-2, "__index");
 
     L.pop(1);
@@ -115,6 +118,21 @@ fn luaSetWindowPos(L: *Lua) i32 {
     const y = L.toInteger(3) catch 0;
 
     window_ptr.setPos(@intCast(x), @intCast(y));
+
+    return 0;
+}
+
+fn luaDrawTextToWindow(L: *Lua) i32 {   
+    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
+    const window_ptr = window_ptr_ptr.*;
+
+    const x = L.toInteger(2) catch 0;
+    const y = L.toInteger(3) catch 0;
+    const text = L.toString(4) catch "";
+    const font = L.toString(5) catch "arial";
+    const size = L.toInteger(6) catch 16;
+
+    window_ptr.drawText(@intCast(x), @intCast(y), text, font, @intCast(size));
 
     return 0;
 }

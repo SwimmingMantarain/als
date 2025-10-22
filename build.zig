@@ -38,6 +38,8 @@ pub fn build(b: *std.Build) void {
     exe.linkLibC();
     exe.linkSystemLibrary("wayland-client");
     exe.linkSystemLibrary("xkbcommon");
+    exe.linkSystemLibrary("freetype2");
+    exe.linkSystemLibrary("harfbuzz");
 
     b.installArtifact(exe);
 }
