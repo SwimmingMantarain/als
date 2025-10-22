@@ -44,10 +44,25 @@ pub const Context = struct {
     xkb_keymap: ?*xkb.xkb_keymap,
     xkb_state: ?*xkb.xkb_state,
 
+    // FreeType shenanigans
+    ft: ft.FT_Library,
+    ft_face: ft.FT_Face,
+
     pub fn init(gpa: Allocator, display: *wl.Display, lua: *zlua.Lua) !Context {
         const xkb_context = xkb.xkb_context_new(xkb.XKB_CONTEXT_NO_FLAGS);
         if (xkb_context == null) {
             return error.XkbContextFailed;
+        }
+
+        var ft_lib: ft.FT_Library = undefined;
+        if (ft.FT_Init_FreeType(&ft_lib) == 1) {
+            return error.FreeTypeInitFailed;
+        }
+
+        const font_path = "/usr/share/fonts/TTF/M+1NerdFont-Regular.ttf";
+        var ft_face: ft.FT_Face = undefined;
+        if (ft.FT_New_Face(ft_lib, font_path, 0, &ft_face) == 1) {
+            return error.FreeTypeFontFaceInitFailed;
         }
 
         const context = Context{
@@ -67,6 +82,8 @@ pub const Context = struct {
             .xkb_context = xkb_context,
             .xkb_keymap = null,
             .xkb_state = null,
+            .ft = ft_lib,
+            .ft_face = ft_face,
         };
         
         return context;

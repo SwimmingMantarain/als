@@ -8,6 +8,8 @@ const xdg = wayland.client.xdg;
 const zwlr = wayland.client.zwlr;
 
 const Context = @import("./context.zig").Context;
+const ft = @import("./context.zig").ft;
+const hb = @import("./context.zig").hb;
 
 pub const OutputInfo = struct {
     output: *wl.Output,
@@ -173,8 +175,26 @@ pub const Window = struct {
         if (display.flush() != .SUCCESS) return error.FlushFailed;
     }
 
-    pub fn drawText(_: *Window, x: i32, y: i32, text: []const u8, font: []const u8, size: i32) void {
-        std.debug.print("{}, {}, {s}, {s}, {}", .{ x, y, text, font, size });
+    pub fn drawText(_: *Window, x: i32, y: i32, text: []const u8, font: []const u8, size: i32, context: *Context) void {
+        std.debug.print("{}, {}, {s}, {s}, {}\n", .{ x, y, text, font, size });
+
+        ft.FT_Set_Char_Size(context.ft_face, 32, 32, 32, 32);
+
+        const hb_font: *hb.hb_font_t = hb.hb_ft_font_create(context.ft_face, null);
+        const hb_buffer: *hb.hb_buffer_t = hb.hb_buffer_create();
+
+        hb.hb_buffer_add_utf8(hb_buffer, text, -1, 0, 1);
+        hb.hb_buffer_guess_segment_properties(hb_buffer);
+
+        hb.hb_shape(hb_font, hb_buffer, null, 0);
+
+        const glyph_count: u32 = undefined;
+        const glyph_info: *hb.hb_glyph_info_t = hb.hb_buffer_get_glyph_infos(hb_buffer, &glyph_count);
+        const glyph_position: *hb.hb_glyph_position_t = hb.hb_buffer_get_glyph_positions(hb_buffer, &glyph_count);
+
+        std.debug.print("Glyph count: {}\n", .{ glyph_count });
+
+
     }
 
     pub fn setPos(self: *Window, x: i32, y: i32) void {

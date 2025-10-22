@@ -132,7 +132,13 @@ fn luaDrawTextToWindow(L: *Lua) i32 {
     const font = L.toString(5) catch "arial";
     const size = L.toInteger(6) catch 16;
 
-    window_ptr.drawText(@intCast(x), @intCast(y), text, font, @intCast(size));
+    const context = getContext(L) catch {
+        _ = L.pushString("Failed to get context");
+        L.raiseError();
+        return 0;
+    };
+
+    window_ptr.drawText(@intCast(x), @intCast(y), text, font, @intCast(size), context);
 
     return 0;
 }
