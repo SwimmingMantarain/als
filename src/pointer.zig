@@ -25,28 +25,33 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
     switch (event) {
         .enter => |enter| {
             for (context.windows.items) |*w| {
-                std.debug.print("Window: {}, 
-                if (w.surface == enter.surface) {
-                    context.active_window = w;
-                    if (w.callbacks.mouseenter) |callback| {
-                        handleCallback(w, callback, context);
+                for (w.monitors.items) |*m| {
+                    if (m.surface == enter.surface) {
+                        context.active_window = w;
+                        context.active_monitor = m;
+                        if (w.callbacks.mouseenter) |callback| {
+                            handleCallback(w, callback, context);
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         },
         .leave => |leave| {
             for (context.windows.items) |*w| {
-                if (w.surface == leave.surface) {
-                    if (context.active_window) |active| {
-                        if (active.surface == leave.surface) {
-                            context.active_window = null;
+                for (w.monitors.items) |*m| {
+                    if (m.surface == leave.surface) {
+                        if (context.active_monitor) |active| {
+                            if (active.surface == leave.surface) {
+                                context.active_window = null;
+                                context.active_monitor = null;
+                            }
                         }
+                        if (w.callbacks.mouseleave) |callback| {
+                            handleCallback(w, callback, context);
+                        }
+                        break;
                     }
-                    if (w.callbacks.mouseleave) |callback| {
-                        handleCallback(w, callback, context);
-                    }
-                    break;
                 }
             }
         },

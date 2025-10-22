@@ -26,6 +26,7 @@ pub const Context = struct {
     keyboard: ?*wl.Keyboard,
     windows: std.ArrayList(window.Window),
     active_window: ?*window.Window,
+    active_monitor: ?*window.Monitor,
     lua: *zlua.Lua,
 
     // xkb shenanigans
@@ -51,6 +52,7 @@ pub const Context = struct {
             .keyboard = null,
             .windows = try .initCapacity(gpa, 5),
             .active_window = null,
+            .active_monitor = null,
             .lua = lua,
             .xkb_context = xkb_context,
             .xkb_keymap = null,

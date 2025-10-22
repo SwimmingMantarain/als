@@ -7,7 +7,7 @@ const wl = wayland.client.wl;
 const xdg = wayland.client.xdg;
 const zwlr = wayland.client.zwlr;
 
-const Context = @import("./context.zig");
+const Context = @import("./context.zig").Context;
 
 pub const OutputInfo = struct {
     output: *wl.Output,
@@ -20,7 +20,6 @@ pub const Monitor = struct {
     surface: *wl.Surface,
     layer_surface: *zwlr.LayerSurfaceV1,
     buffer: Buffer,
-    callbacks: Callbacks,
 };
 
 const Buffer = struct {
@@ -40,6 +39,8 @@ pub const Callbacks = struct {
 
 pub const Window = struct {
     monitors: std.ArrayList(Monitor),
+    callbacks: Callbacks,
+    context: *Context,
     x: i32,
     y: i32,
     width: u64,
@@ -51,25 +52,12 @@ pub const Window = struct {
         height: u64,
         x: i32,
         y: i32,
-        display: *wl.Display,
-        compositor: *wl.Compositor,
-        shm: *wl.Shm,
-        layer_shell: *zwlr.LayerShellV1,
-        outputs: *std.ArrayList(OutputInfo),
         context: *Context,
+        outputs: []OutputInfo,
     ) !Window {
-        const callbacks = Callbacks{
-            .leftpress = null,
-            .leftrelease = null,
-            .mouseenter = null,
-            .mouseleave = null,
-            .mousemotion = null,
-            .key = null,
-        };
+        var monitors =  try std.ArrayList(Monitor).initCapacity(context.allocator, 5);
 
-        var monitors = std.ArrayList(Monitors).initCapacity(context.allocator, 5);
-
-        for (outputs.items) |out_info| {
+        for (outputs) |out_info| {
             const mbuffer = blk: {
                 const stride = width * 4;
                 const size = stride * height;
@@ -90,7 +78,7 @@ pub const Window = struct {
                 const pixel_count = size / 4;
                 @memset(pixels[0..pixel_count], 0xFF00FF00); // ARGB
 
-                const pool = try shm.createPool(fd, @as(i32, @intCast(size)));
+                const pool = try context.shm.?.createPool(fd, @as(i32, @intCast(size)));
                 defer pool.destroy();
 
                 const buffer = try pool.createBuffer(
@@ -108,14 +96,14 @@ pub const Window = struct {
                 };
             };
 
-            const surface = try compositor.createSurface();
+            const surface = try context.compositor.?.createSurface();
 
-            const region = try compositor.createRegion();
+            const region = try context.compositor.?.createRegion();
             region.add(0, 0, @intCast(width), @intCast(height));
             surface.setInputRegion(region);
             region.destroy();
 
-            const layer_surface = try layer_shell.getLayerSurface(
+            const layer_surface = try context.layer_shell.?.getLayerSurface(
                 surface,
                 out_info.output,
                 zwlr.LayerShellV1.Layer.overlay,
@@ -136,7 +124,7 @@ pub const Window = struct {
             surface.commit();
 
             while (!configured) {
-                if (display.dispatch() != .SUCCESS) return error.DispatchFailed;
+                if (context.display.dispatch() != .SUCCESS) return error.DispatchFailed;
             }
 
             surface.attach(mbuffer.buffer, 0, 0);
@@ -146,21 +134,30 @@ pub const Window = struct {
                 .surface = surface,
                 .layer_surface = layer_surface,
                 .buffer = mbuffer,
-                .callbacks = callbacks,
             };
 
-            monitors.append(allocator, mon);
+            monitors.append(context.allocator, mon) catch {
+                std.debug.print("Failed to append monitor\n", .{});
+            };
+        }
+
+        const callbacks = Callbacks{
+            .leftpress = null,
+            .leftrelease = null,
+            .mouseenter = null,
+            .mouseleave = null,
+            .mousemotion = null,
+            .key = null,
         };
 
         return Window{
-            .surface = surface,
-            .layer_surface = layer_surface,
-            .wBuffer = wBuffer,
+            .monitors = monitors,
+            .callbacks = callbacks,
+            .context = context,
             .x = x,
             .y = y,
             .width = width,
             .height = height,
-            .callbacks = callbacks,
         };
     }
 
@@ -175,11 +172,15 @@ pub const Window = struct {
     }
 
     pub fn setColor(self: *Window, color: u32) void {
-        const pixels = self.wBuffer.pixels;
-        const pixel_count = self.wBuffer.pixel_count;
-        @memset(pixels[0..pixel_count], color); // ARGB
-        self.surface.attach(self.wBuffer.buffer, 0, 0);
-        self.surface.commit();
+        for (self.monitors.items) |*monitor| {
+            if (monitor == self.context.active_monitor) {
+                const pixels = monitor.buffer.pixels;
+                const pixel_count = monitor.buffer.pixel_count;
+                @memset(pixels[0..pixel_count], color); // ARGB
+                monitor.surface.attach(monitor.buffer.buffer, 0, 0);
+                monitor.surface.commit();
+            }
+        }
     }
 };
 

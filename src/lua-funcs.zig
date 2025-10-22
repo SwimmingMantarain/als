@@ -122,28 +122,23 @@ fn luaCreateWindow(L: *Lua) i32 {
     else
         context.outputs.items[0..1];
 
-    for (outputs) |output_info| {
-        const w = window.Window.init(
-            "als-window",
-            @intCast(width), @intCast(height),
-            @intCast(x), @intCast(y),
-            context.display,
-            context.compositor.?,
-            context.shm.?,
-            context.layer_shell.?,
-            output_info.output
-        ) catch {
-            _ = L.pushString("Failed to create window");
-            L.raiseError();
-            return 0;
-        };
+    const w = window.Window.init(
+        "als-window",
+        @intCast(width), @intCast(height),
+        @intCast(x), @intCast(y),
+        context,
+        outputs,
+    ) catch {
+        _ = L.pushString("Failed to create window");
+        L.raiseError();
+        return 0;
+    };
 
-        context.windows.append(context.allocator, w) catch {
-            _ = L.pushString("Failed to append window");
-            L.raiseError();
-            return 0;
-        };
-    }
+    context.windows.append(context.allocator, w) catch {
+        _ = L.pushString("Failed to append window");
+        L.raiseError();
+        return 0;
+    };
 
     const window_ptr = &context.windows.items[context.windows.items.len - 1];
     const userdata_ptr = L.newUserdata(*window.Window, 0);
