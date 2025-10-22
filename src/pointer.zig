@@ -14,6 +14,8 @@ const Context = @import("./context.zig").Context;
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
 
+const handleCallback = @import("./lua-funcs.zig").handleCallback;
+
 const PointerEvent = enum {
     Enter,
     Leave,
@@ -30,7 +32,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                         context.active_window = w;
                         context.active_monitor = m;
                         if (w.callbacks.mouseenter) |callback| {
-                            handleCallback(w, callback, context);
+                            handleCallback(w, callback, context, .{});
                         }
                         break;
                     }
@@ -48,7 +50,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                             }
                         }
                         if (w.callbacks.mouseleave) |callback| {
-                            handleCallback(w, callback, context);
+                            handleCallback(w, callback, context, .{});
                         }
                         break;
                     }
@@ -58,7 +60,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
         .motion => {
             if (context.active_window) |active_window| {
                 if (active_window.callbacks.mousemotion) |callback| {
-                    handleCallback(active_window, callback, context);
+                    handleCallback(active_window, callback, context, .{});
                 }
             }
         },
@@ -69,40 +71,15 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
 
                 if (btn == 272 and state == .pressed) { // Left click and pressed
                     if (active_window.callbacks.leftpress) |callback| {
-                        handleCallback(active_window, callback, context);
+                        handleCallback(active_window, callback, context, .{});
                     }
                 } else if (btn == 272 and state == .released) { // Left click and released
                     if (active_window.callbacks.leftrelease) |callback| {
-                        handleCallback(active_window, callback, context);
+                        handleCallback(active_window, callback, context, .{});
                     }
                 }
             }
         },
         else => {},
     }
-}
-
-fn handleCallback(active_window: *window.Window, callback: i32, context: *Context) void {
-    _ = context.lua.rawGetIndex(zlua.registry_index, callback);
-
-    const userdata_ptr = context.lua.newUserdata(*window.Window, 0);
-    userdata_ptr.* = active_window;
-
-    _ = context.lua.getMetatableRegistry("Window");
-    context.lua.setMetatable(-2);
-
-    const args = zlua.Lua.ProtectedCallArgs {
-        .args = 1, // One argument
-        .results = 0,
-        .msg_handler = 0,
-    };
-
-    context.lua.protectedCall(args) catch |err| {
-        std.debug.print("Lua callback error: {}\n", .{err});
-        if (context.lua.isString(-1)) {
-            const err_msg = context.lua.toString(-1) catch "unkown";
-            std.debug.print("Error message: {s}\n", .{err_msg});
-        }
-        context.lua.pop(1);
-    };
 }

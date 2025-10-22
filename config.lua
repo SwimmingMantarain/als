@@ -18,10 +18,13 @@ end
 
 function Leave(window)
     window:set_color(0xFF0000FF)
+    window:set_position(0, 0)
 end
 
-function Key(window)
+function Key(window, key)
     window:set_color(0xFF000000)
+    print("Key: ", key)
+    window:set_position(300, 500)
 end
 
 Window1:set_callback("leftpress", Leftpress)

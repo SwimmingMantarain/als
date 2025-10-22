@@ -34,6 +34,9 @@ fn createWindowMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaSetWindowColor));
     L.setField(-2, "set_color");
 
+    L.pushFunction(zlua.wrap(luaSetWindowPos));
+    L.setField(-2, "set_position");
+
     L.setField(-2, "__index");
 
     L.pop(1);
@@ -104,6 +107,18 @@ fn luaSetWindowColor(L: *Lua) i32 {
     return 0;
 }
 
+fn luaSetWindowPos(L: *Lua) i32 {
+    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
+    const window_ptr = window_ptr_ptr.*;
+
+    const x = L.toInteger(2) catch 0;
+    const y = L.toInteger(3) catch 0;
+
+    window_ptr.setPos(@intCast(x), @intCast(y));
+
+    return 0;
+}
+
 fn luaCreateWindow(L: *Lua) i32 {
     const width = L.toInteger(1) catch 100;
     const height = L.toInteger(2) catch 100;
@@ -148,4 +163,48 @@ fn luaCreateWindow(L: *Lua) i32 {
     L.setMetatable(-2);
 
     return 1;
+}
+
+pub fn handleCallback(
+    active_window: *window.Window,
+    callback: i32,
+    context: *Context,
+    extra_args: anytype,
+    ) void {
+    _ = context.lua.rawGetIndex(zlua.registry_index, callback);
+
+    const userdata_ptr = context.lua.newUserdata(*window.Window, 0);
+    userdata_ptr.* = active_window;
+
+    _ = context.lua.getMetatableRegistry("Window");
+    context.lua.setMetatable(-2);
+
+    const fields = @typeInfo(@TypeOf(extra_args)).@"struct".fields;
+    var total_args: i32 = 1;
+
+    inline for (fields) |field| {
+        const value = @field(extra_args, field.name);
+        switch (@typeInfo(field.type)) {
+            .int => context.lua.pushInteger(value),
+            .float => context.lua.pushNumber(value),
+            .array => context.lua.pushString(value),
+            else => @compileError("Unsupported type for Lua callback"),
+        }
+        total_args += 1;
+    }
+
+    const args = zlua.Lua.ProtectedCallArgs {
+        .args = total_args,
+        .results = 0,
+        .msg_handler = 0,
+    };
+
+    context.lua.protectedCall(args) catch |err| {
+        std.debug.print("Lua callback error: {}\n", .{err});
+        if (context.lua.isString(-1)) {
+            const err_msg = context.lua.toString(-1) catch "unkown";
+            std.debug.print("Error message: {s}\n", .{err_msg});
+        }
+        context.lua.pop(1);
+    };
 }

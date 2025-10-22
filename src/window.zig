@@ -173,6 +173,15 @@ pub const Window = struct {
         if (display.flush() != .SUCCESS) return error.FlushFailed;
     }
 
+    pub fn setPos(self: *Window, x: i32, y: i32) void {
+        for (self.monitors.items) |*monitor| {
+            if (monitor == self.context.active_monitor) {
+                monitor.layer_surface.setMargin(0, 0, y, x); // top right bottom left
+                monitor.surface.commit();
+            }
+        }
+    }
+
     pub fn setColor(self: *Window, color: u32) void {
         for (self.monitors.items) |*monitor| {
             if (monitor == self.context.active_monitor) {

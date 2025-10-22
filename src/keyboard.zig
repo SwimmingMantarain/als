@@ -17,6 +17,8 @@ const Lua = zlua.Lua;
 
 const xkb = @import("./context.zig").xkb;
 
+const handleCallback = @import("./lua-funcs.zig").handleCallback;
+
 pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Context) void {
     switch (event) {
         .keymap => |keymap| {
@@ -49,37 +51,10 @@ pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Con
                     const keysym = xkb.xkb_state_key_get_one_sym(context.xkb_state, key.key + 8); // +8 for linux evdev
                     const keyutf32 = xkb.xkb_keysym_to_utf32(keysym);
 
-                    std.debug.print("Key: {}\n", .{ keyutf32 });
-
-                    handleCallback(active_window, callback, context);
+                    handleCallback(active_window, callback, context, .{ keyutf32 });
                 }
             }
         },
         else => {},
     }
-}
-
-fn handleCallback(active_window: *window.Window, callback: i32, context: *Context) void {
-    _ = context.lua.rawGetIndex(zlua.registry_index, callback);
-
-    const userdata_ptr = context.lua.newUserdata(*window.Window, 0);
-    userdata_ptr.* = active_window;
-
-    _ = context.lua.getMetatableRegistry("Window");
-    context.lua.setMetatable(-2);
-
-    const args = zlua.Lua.ProtectedCallArgs {
-        .args = 1, // One argument
-        .results = 0,
-        .msg_handler = 0,
-    };
-
-    context.lua.protectedCall(args) catch |err| {
-        std.debug.print("Lua callback error: {}\n", .{err});
-        if (context.lua.isString(-1)) {
-            const err_msg = context.lua.toString(-1) catch "unkown";
-            std.debug.print("Error message: {s}\n", .{err_msg});
-        }
-        context.lua.pop(1);
-    };
 }
