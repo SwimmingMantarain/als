@@ -1,6 +1,6 @@
 Window1 = als.create_window(200, 200, true) -- width, height, onAllMonitors
 Window1:to_edge(UP)
-Window1:draw_text(100, 100, "beans", "arial", 64)
+Window1:draw_text(0, 100, "lua!", "arial", 64)
 
 local function keyboard(window, key)
     if key == 97 then
