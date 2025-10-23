@@ -58,7 +58,7 @@ pub const Context = struct {
             return error.FreeTypeInitFailed;
         }
 
-        const font_path = "/usr/share/fonts/TTF/M+1NerdFont-Regular.ttf";
+        const font_path = "/usr/share/fonts/Adwaita/AdwaitaMono-Regular.ttf";
         var ft_face: ft.FT_Face = undefined;
         if (ft.FT_New_Face(ft_lib, font_path, 0, &ft_face) == 1) {
             return error.FreeTypeFontFaceInitFailed;

@@ -62,6 +62,9 @@ fn createWindowMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaSetWindowEdge));
     L.setField(-2, "to_edge");
 
+    L.pushFunction(zlua.wrap(luaWindowNewLabel));
+    L.setField(-2, "new_label");
+
     L.setField(-2, "__index");
 
     L.pop(1);
@@ -143,15 +146,9 @@ fn luaSetWindowColor(L: *Lua) i32 {
     return 0;
 }
 
-fn luaDrawTextToWindow(L: *Lua) i32 {   
+fn luaWindowNewLabel(L: *Lua) i32 {
     const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
     const window_ptr = window_ptr_ptr.*;
-
-    const x = L.toInteger(2) catch 0;
-    const y = L.toInteger(3) catch 0;
-    const text = L.toString(4) catch "";
-    const font = L.toString(5) catch "arial";
-    const size = L.toInteger(6) catch 16;
 
     const context = getContext(L) catch {
         _ = L.pushString("Failed to get context");
@@ -159,7 +156,23 @@ fn luaDrawTextToWindow(L: *Lua) i32 {
         return 0;
     };
 
-    window_ptr.drawText(@intCast(x), @intCast(y), text, font, @intCast(size), context);
+    const text = L.toString(2) catch "label";
+    const width = L.toInteger(3) catch 100;
+    const height = L.toInteger(4) catch 100;
+    const font_size = L.toInteger(5) catch 16;
+    const padding = L.toInteger(6) catch 0;
+    const alignment = L.toInteger(7) catch 0; // 0 -> center
+
+    const label = window_ptr.newLabel(
+        text,
+        @intCast(font_size),
+        @intCast(width), @intCast(height),
+        @intCast(padding), @intCast(alignment),
+        context,
+    ) catch {
+        L.raiseErrorStr("Failed to create label", .{});
+        return 0;
+    };
 
     return 0;
 }
@@ -167,7 +180,8 @@ fn luaDrawTextToWindow(L: *Lua) i32 {
 fn luaCreateWindow(L: *Lua) i32 {
     const width = L.toInteger(1) catch 100;
     const height = L.toInteger(2) catch 100;
-    const onAllMonitors = L.toBoolean(3);
+    const bgcol = L.toInteger(3) catch 0xFF000000;
+    const onAllMonitors = L.toBoolean(4);
 
     const context = getContext(L) catch {
         _ = L.pushString("Failed to get context");
@@ -183,6 +197,7 @@ fn luaCreateWindow(L: *Lua) i32 {
     const w = window.Window.init(
         "als-window",
         @intCast(width), @intCast(height),
+        @intCast(bgcol),
         context,
         outputs,
     ) catch {
