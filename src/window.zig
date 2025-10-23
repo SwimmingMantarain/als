@@ -43,8 +43,6 @@ pub const Window = struct {
     monitors: std.ArrayList(Monitor),
     callbacks: Callbacks,
     context: *Context,
-    x: i32,
-    y: i32,
     width: u64,
     height: u64,
 
@@ -52,8 +50,6 @@ pub const Window = struct {
         window_name: []const u8,
         width: u64,
         height: u64,
-        x: i32,
-        y: i32,
         context: *Context,
         outputs: []OutputInfo,
     ) !Window {
@@ -116,10 +112,11 @@ pub const Window = struct {
             layer_surface.setAnchor(.{
                 .bottom = true,
                 .left = true,
+                .right = true,
+                .top = true,
             });
 
             layer_surface.setKeyboardInteractivity(.on_demand);
-            layer_surface.setMargin(0, 0, y, x); // top right bottom left
 
             var configured = false;
             layer_surface.setListener(*bool, layerSurfaceListener, &configured);
@@ -156,8 +153,6 @@ pub const Window = struct {
             .monitors = monitors,
             .callbacks = callbacks,
             .context = context,
-            .x = x,
-            .y = y,
             .width = width,
             .height = height,
         };
@@ -173,6 +168,19 @@ pub const Window = struct {
 
     pub fn update(_: *Window, display: *wl.Display) anyerror!void {
         if (display.flush() != .SUCCESS) return error.FlushFailed;
+    }
+
+    pub fn toEdge(self: *Window, edge: i32) void {
+        for (self.monitors.items) |*monitor| {
+            monitor.layer_surface.setAnchor(.{
+                .bottom = if (edge == 2 or edge == 0) true else false,
+                .left = if (edge == 3 or edge == 0) true else false,
+                .right = if (edge == 4 or edge == 0) true else false,
+                .top = if (edge == 1 or edge == 0) true else false,
+            });
+
+            monitor.surface.commit();
+        }
     }
 
     pub fn drawText(self: *Window, x: i32, y: i32, text: []const u8, font: []const u8, size: i32, context: *Context) void {
@@ -276,15 +284,6 @@ pub const Window = struct {
         const out_b = @as(u8, @intFromFloat(@as(f32, @floatFromInt(fg_b)) * alpha_f + @as(f32, @floatFromInt(bg_b)) * (1.0 - alpha_f)));
 
         return (@as(u32, bg_a) << 24) | (@as(u32, out_r) << 16) | (@as(u32, out_g) << 8) | @as(u32, out_b);
-    }
-
-    pub fn setPos(self: *Window, x: i32, y: i32) void {
-        for (self.monitors.items) |*monitor| {
-            if (monitor == self.context.active_monitor) {
-                monitor.layer_surface.setMargin(0, 0, y, x); // top right bottom left
-                monitor.surface.commit();
-            }
-        }
     }
 
     pub fn setColor(self: *Window, color: u32) void {

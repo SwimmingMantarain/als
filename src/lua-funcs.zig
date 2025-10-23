@@ -21,6 +21,22 @@ fn registerModule(L: *Lua) void {
     L.setField(-2, "create_window");
 
     L.setGlobal("als");
+
+    // Global manim like enum stuff
+    L.pushInteger(1);
+    L.setGlobal("UP");
+
+    L.pushInteger(2);
+    L.setGlobal("DOWN");
+
+    L.pushInteger(3);
+    L.setGlobal("LEFT");
+
+    L.pushInteger(4);
+    L.setGlobal("RIGHT");
+
+    L.pushInteger(0);
+    L.setGlobal("CENTER");
 }
 
 fn createWindowMetatable(L: *Lua) void {
@@ -34,11 +50,11 @@ fn createWindowMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaSetWindowColor));
     L.setField(-2, "set_color");
 
-    L.pushFunction(zlua.wrap(luaSetWindowPos));
-    L.setField(-2, "set_position");
-
     L.pushFunction(zlua.wrap(luaDrawTextToWindow));
     L.setField(-2, "draw_text");
+
+    L.pushFunction(zlua.wrap(luaSetWindowEdge));
+    L.setField(-2, "to_edge");
 
     L.setField(-2, "__index");
 
@@ -96,6 +112,17 @@ fn luaSetCallback(L: *Lua) i32 {
     return 0;
 }
 
+fn luaSetWindowEdge(L: *Lua) i32 {
+    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
+    const window_ptr = window_ptr_ptr.*;
+
+    const edge = L.toInteger(2) catch 0; // 0 -> center
+
+    window_ptr.toEdge(@intCast(edge));
+
+    return 0;
+}
+
 fn luaSetWindowColor(L: *Lua) i32 {
     const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
     const window_ptr = window_ptr_ptr.*;
@@ -106,18 +133,6 @@ fn luaSetWindowColor(L: *Lua) i32 {
     };
 
     window_ptr.setColor(@as(u32, @intCast(color)));
-
-    return 0;
-}
-
-fn luaSetWindowPos(L: *Lua) i32 {
-    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
-    const window_ptr = window_ptr_ptr.*;
-
-    const x = L.toInteger(2) catch 0;
-    const y = L.toInteger(3) catch 0;
-
-    window_ptr.setPos(@intCast(x), @intCast(y));
 
     return 0;
 }
@@ -146,9 +161,7 @@ fn luaDrawTextToWindow(L: *Lua) i32 {
 fn luaCreateWindow(L: *Lua) i32 {
     const width = L.toInteger(1) catch 100;
     const height = L.toInteger(2) catch 100;
-    const x = L.toInteger(3) catch 0;
-    const y = L.toInteger(4) catch 0;
-    const onAllMonitors = L.toBoolean(5);
+    const onAllMonitors = L.toBoolean(3);
 
     const context = getContext(L) catch {
         _ = L.pushString("Failed to get context");
@@ -164,7 +177,6 @@ fn luaCreateWindow(L: *Lua) i32 {
     const w = window.Window.init(
         "als-window",
         @intCast(width), @intCast(height),
-        @intCast(x), @intCast(y),
         context,
         outputs,
     ) catch {
