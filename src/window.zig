@@ -115,6 +115,7 @@ pub const Window = struct {
             );
 
             layer_surface.setSize(@intCast(width), @intCast(height));
+            layer_surface.setExclusiveZone(@intCast(height));
             layer_surface.setAnchor(.{
                 .bottom = true,
                 .left = true,
@@ -239,7 +240,6 @@ pub const Window = struct {
         }
 
         // Clean up
-
         hb.hb_buffer_destroy(hb_buffer);
         hb.hb_font_destroy(hb_font);
     }
