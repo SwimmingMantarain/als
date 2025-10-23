@@ -37,6 +37,12 @@ fn registerModule(L: *Lua) void {
 
     L.pushInteger(0);
     L.setGlobal("CENTER");
+
+    L.pushInteger(-1);
+    L.setGlobal("SCREEN_WIDTH");
+    
+    L.pushInteger(-1);
+    L.setGlobal("SCREEN_HEIGHT");
 }
 
 fn createWindowMetatable(L: *Lua) void {

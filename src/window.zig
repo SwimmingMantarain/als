@@ -26,6 +26,8 @@ pub const Monitor = struct {
 
 const Buffer = struct {
     buffer: *wl.Buffer,
+    width: u64,
+    height: u64,
     pixels: [*]u32,
     pixel_count: usize,
 };
@@ -43,19 +45,21 @@ pub const Window = struct {
     monitors: std.ArrayList(Monitor),
     callbacks: Callbacks,
     context: *Context,
-    width: u64,
-    height: u64,
 
     pub fn init(
         window_name: []const u8,
-        width: u64,
-        height: u64,
+        w: i64,
+        h: i64,
         context: *Context,
         outputs: []OutputInfo,
     ) !Window {
         var monitors =  try std.ArrayList(Monitor).initCapacity(context.allocator, 5);
 
         for (outputs) |out_info| {
+            // Check if we want to be as wide or tall as the screen
+            const width: u64 = if (w < 0) @as(u64, @intCast(out_info.width)) else @as(u64, @intCast(w));
+            const height: u64 = if (h < 0) @as(u64, @intCast(out_info.height)) else @as(u64, @intCast(h));
+
             const mbuffer = blk: {
                 const stride = width * 4;
                 const size = stride * height;
@@ -89,6 +93,8 @@ pub const Window = struct {
 
                 break :blk Buffer {
                     .buffer = buffer,
+                    .width = width,
+                    .height = height,
                     .pixels = pixels,
                     .pixel_count = pixel_count,
                 };
@@ -153,8 +159,6 @@ pub const Window = struct {
             .monitors = monitors,
             .callbacks = callbacks,
             .context = context,
-            .width = width,
-            .height = height,
         };
     }
 
@@ -251,12 +255,12 @@ pub const Window = struct {
                     const px = x + @as(i32, @intCast(col));
                     const py = y + @as(i32, @intCast(row));
 
-                    if (px < 0 or py < 0 or px >= self.width or py >= self.height) continue;
+                    if (px < 0 or py < 0 or px >= monitor.buffer.width or py >= monitor.buffer.height) continue;
 
                     const alpha = bitmap.buffer[row * @as(u32, @intCast(bitmap.pitch)) + col];
                     if (alpha == 0) continue;
 
-                    const pixel_index = @as(usize, @intCast(py)) * self.width + @as(usize, @intCast(px));
+                    const pixel_index = @as(usize, @intCast(py)) * monitor.buffer.width + @as(usize, @intCast(px));
 
                     const text_color: u32 = 0xFFFFFFFF; // White ARGB
                     const bg_color = pixels[pixel_index];
