@@ -4,23 +4,17 @@ const ft = @import("./context.zig").ft;
 const hb = @import("./context.zig").hb;
 
 const Context = @import("./context.zig").Context;
-const Window = @import("./window.zig").Window;
-
-pub const WidgetBuffer = struct {
-    width: u32,
-    height: u32,
-    padding: u32,
-};
+const Monitor = @import("./window.zig").Monitor;
 
 pub const Label = struct {
-    wb: WidgetBuffer,
     text: []const u8,
     font_size: u32,
     alignment: u32,
+    padding: u32,
     bg_color: u32,
     fg_color: u32,
 
-    pub fn render(self: *Label, pixels: [*]u32, parent_width: u64, parent_height: u64, context: *Context) void {
+    pub fn render(self: *Label, monitor: *Monitor, context: *Context) void {
         if (ft.FT_Set_Pixel_Sizes(context.ft_face, @intCast(self.font_size), @intCast(self.font_size)) != 0) {
             std.debug.print("Failed to set character size\n", .{});
             return;
@@ -54,45 +48,53 @@ pub const Label = struct {
             total_width += @divTrunc(positions[i].x_advance, 64);
         }
 
-        const bg_x: i64 = @intCast((parent_width - @as(u64, @intCast(self.wb.width + self.wb.padding))) / 2);
-        const bg_y: i64 = @intCast((parent_height - @as(u64, @intCast(self.wb.height))) / 2);
-        
-        // Draw the background
+        const face_size = context.ft_face.*.size.*.metrics;
+        const ascender: i64 = @divTrunc(face_size.ascender, 64);
+        const descender: i64 = @divTrunc(face_size.descender, 64);
+        const total_height: i64 = ascender - descender; // descender is negative
+
+        std.debug.print("Text dimensions: {}x{} (ascender: {}, descender: {})\n", 
+            .{ total_width, total_height, ascender, descender });
+
+        const bg_width: u32 = @as(u32, @intCast(total_width)) + 2 * self.padding;
+        const bg_height: u32 = @as(u32, @intCast(total_height)) + 2 * self.padding;
+
+        std.debug.print("{}, {}, {}, {}\n", .{ monitor.buffer.height, bg_height, ascender, descender });
+
+        const bg_x: i64 = @intCast((monitor.buffer.width - @as(u64, @intCast(bg_width))) / 2);
+        const bg_y: i64 = @intCast((monitor.buffer.height - @as(u64, @intCast(bg_height))) / 2);
+
+        // Draw background
         var y: u32 = 0;
-        while (y < self.wb.height) : (y += 1) {
+        while (y < bg_height) : (y += 1) {
             var x: u32 = 0;
-            while (x < self.wb.width + self.wb.padding) : (x += 1) {
+            while (x < bg_width) : (x += 1) {
                 const px = bg_x + @as(i64, @intCast(x));
                 const py = bg_y + @as(i64, @intCast(y));
-                
+
                 if (px >= 0 and py >= 0 and 
-                    px < @as(i64, @intCast(parent_width)) and 
-                    py < @as(i64, @intCast(parent_height))) {
-                    const idx = @as(usize, @intCast(py)) * parent_width + @as(usize, @intCast(px));
-                    pixels[idx] = self.bg_color;
+                    px < @as(i64, @intCast(monitor.buffer.width)) and 
+                    py < @as(i64, @intCast(monitor.buffer.height))) {
+                    const idx = @as(usize, @intCast(py)) * monitor.buffer.width + @as(usize, @intCast(px));
+                    monitor.buffer.pixels[idx] = self.bg_color;
                 }
             }
         }
 
-        const widget_x: i64 = @intCast((parent_width - @as(u64, @intCast(self.wb.width))) / 2);
-        const widget_y: i64 = @intCast((parent_height - @as(u64, @intCast(self.wb.height))) / 2);
+        var text_start_x: i64 = bg_x + @as(i64, @intCast(self.padding));
+        const text_start_y: i64 = bg_y + @as(i64, @intCast(self.padding));
 
-        var text_start_x: i64 = widget_x + @as(i64, @intCast(self.wb.padding));
-        const text_start_y: i64 = widget_y + @as(i64, @intCast(self.wb.padding));
-
-        const available_width: i64 = @as(i64, @intCast(self.wb.width)) - 2 * @as(i64, @intCast(self.wb.padding));
+        const available_width: i64 = @as(i64, @intCast(total_width));
         if (self.alignment == 0) { // CENTER
             text_start_x += @divTrunc(available_width - total_width, 2);
         } else if (self.alignment == 4) { // RIGHT
             text_start_x += available_width - total_width;
         }
 
-        const font_height: i64 = @as(i64, @intCast(@divTrunc((context.ft_face.*.ascender + context.ft_face.*.descender), 64)));
+        var pen_x: i64 = text_start_x;
+        var pen_y: i64 = text_start_y + ascender;
 
         // Render each glyph
-        var pen_x: i64 = text_start_x;
-        var pen_y: i64 = text_start_y + @as(i64, @intCast(self.font_size)) - font_height; // Baseline
-
         for (0..glyph_count) |i| {
             const glyph_index = infos[i].codepoint;
 
@@ -108,7 +110,7 @@ pub const Label = struct {
             const draw_x = pen_x + @as(i64, @intCast(glyph_left)) + @divTrunc(positions[i].x_offset, 64);
             const draw_y = pen_y - @as(i64, @intCast(glyph_top)) + @divTrunc(positions[i].y_offset, 64);
 
-            self.drawBitmap(bitmap, draw_x, draw_y, pixels, parent_width, parent_height);
+            self.drawBitmap(bitmap, draw_x, draw_y, monitor.buffer.pixels, monitor.buffer.width, monitor.buffer.height);
 
             pen_x += @divTrunc(positions[i].x_advance, 64);
             pen_y += @divTrunc(positions[i].y_advance, 64);

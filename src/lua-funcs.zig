@@ -137,16 +137,13 @@ fn luaWindowNewLabel(L: *Lua) i32 {
     };
 
     const text = L.toString(2) catch "label";
-    const width = L.toInteger(3) catch 100;
-    const height = L.toInteger(4) catch 100;
-    const font_size = L.toInteger(5) catch 16;
-    const padding = L.toInteger(6) catch 0;
-    const alignment = L.toInteger(7) catch 0; // 0 -> center
+    const font_size = L.toInteger(3) catch 16;
+    const padding = L.toInteger(4) catch 0;
+    const alignment = L.toInteger(5) catch 0; // 0 -> center
 
     _ = window_ptr.newLabel(
         text,
         @intCast(font_size),
-        @intCast(width), @intCast(height),
         @intCast(padding), @intCast(alignment),
         context,
     ) catch {

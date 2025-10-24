@@ -191,7 +191,7 @@ pub const Window = struct {
 
             for (self.monitors.items) |*monitor| {
                 for (self.widgets.items) |*widget| {
-                    widget.render(monitor.buffer.pixels, monitor.buffer.width, monitor.buffer.height, context);
+                    widget.render(monitor, context);
                 }
                 monitor.surface.attach(monitor.buffer.buffer, 0, 0);
                 monitor.surface.commit();
@@ -199,18 +199,12 @@ pub const Window = struct {
         }
     }
 
-    pub fn newLabel(self: *Window, text: []const u8, font_size: u32, width: u32, height: u32, padding: u32, alignment: u32, context: *Context) anyerror!*Label {
-        const wb = WidgetBuffer{
-            .width = width,
-            .height = height,
-            .padding = padding,
-        };
-
+    pub fn newLabel(self: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32, context: *Context) anyerror!*Label {
         const label = Label{
-            .wb = wb,
             .text = text,
             .font_size = font_size,
             .alignment = alignment,
+            .padding = padding,
             .bg_color = 0xFF119911,
             .fg_color = 0xFFFFFFFF,
         };
