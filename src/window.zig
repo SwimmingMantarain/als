@@ -50,6 +50,7 @@ pub const Window = struct {
     widgets: std.ArrayList(Label),
     callbacks: Callbacks,
     context: *Context,
+    redraw: bool,
 
     pub fn init(
         window_name: []const u8,
@@ -169,6 +170,7 @@ pub const Window = struct {
             .widgets = widgets,
             .callbacks = callbacks,
             .context = context,
+            .redraw = true,
         };
     }
 
@@ -183,20 +185,25 @@ pub const Window = struct {
     pub fn update(self: *Window, display: *wl.Display, context: *Context) anyerror!void {
         if (display.flush() != .SUCCESS) return error.FlushFailed;
 
-        self.clear();
+        if (self.redraw) {
+            self.redraw = false;
+            self.clear();
 
-        for (self.monitors.items) |*monitor| {
-            for (self.widgets.items) |*widget| {
-                widget.render(monitor.buffer.pixels, context);
+            for (self.monitors.items) |*monitor| {
+                for (self.widgets.items) |*widget| {
+                    widget.render(monitor.buffer.pixels, monitor.buffer.width, monitor.buffer.height, context);
+                }
+                monitor.surface.attach(monitor.buffer.buffer, 0, 0);
+                monitor.surface.commit();
             }
-            monitor.surface.commit();
         }
     }
 
     pub fn newLabel(self: *Window, text: []const u8, font_size: u32, width: u32, height: u32, padding: u32, alignment: u32, context: *Context) anyerror!*Label {
         const wb = WidgetBuffer{
-            .width = width + padding * 2,
-            .height = height + padding * 2,
+            .width = width,
+            .height = height,
+            .padding = padding,
         };
 
         const label = Label{
@@ -204,7 +211,7 @@ pub const Window = struct {
             .text = text,
             .font_size = font_size,
             .alignment = alignment,
-            .bg_color = 0xFF111111,
+            .bg_color = 0xFF119911,
             .fg_color = 0xFFFFFFFF,
         };
 
@@ -228,13 +235,9 @@ pub const Window = struct {
 
     pub fn clear(self: *Window) void {
         for (self.monitors.items) |*monitor| {
-            if (monitor == self.context.active_monitor) {
-                const pixels = monitor.buffer.pixels;
-                const pixel_count = monitor.buffer.pixel_count;
-                @memset(pixels[0..pixel_count], self.bg_color);
-                monitor.surface.attach(monitor.buffer.buffer, 0, 0);
-                monitor.surface.commit();
-            }
+            const pixels = monitor.buffer.pixels;
+            const pixel_count = monitor.buffer.pixel_count;
+            @memset(pixels[0..pixel_count], self.bg_color);
         }
     }
 };
