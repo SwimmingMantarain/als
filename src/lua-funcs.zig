@@ -3,6 +3,7 @@ const zlua = @import("zlua");
 const Lua = zlua.Lua;
 const Context = @import("./context.zig").Context;
 const window = @import("./window.zig");
+const widgets = @import("./widgets.zig");
 
 pub fn init(L: *Lua, context: *Context) void {
     L.pushLightUserdata(context);
@@ -14,6 +15,9 @@ pub fn init(L: *Lua, context: *Context) void {
 fn registerModule(L: *Lua) void {
     // Create window object
     createWindowMetatable(L);
+
+    // Create label object
+    createLabelMetatable(L);
 
     L.createTable(0, 1);
 
@@ -58,6 +62,16 @@ fn createWindowMetatable(L: *Lua) void {
 
     L.pushFunction(zlua.wrap(luaWindowNewLabel));
     L.setField(-2, "new_label");
+
+    L.setField(-2, "__index");
+
+    L.pop(1);
+}
+
+fn createLabelMetatable(L: *Lua) void {
+    L.newMetatable("Label") catch return;
+
+    L.createTable(0, 1);
 
     L.setField(-2, "__index");
 
@@ -141,17 +155,25 @@ fn luaWindowNewLabel(L: *Lua) i32 {
     const padding = L.toInteger(4) catch 0;
     const alignment = L.toInteger(5) catch 0; // 0 -> center
 
-    _ = window_ptr.newLabel(
+    const label = window_ptr.newLabel(
         text,
         @intCast(font_size),
         @intCast(padding), @intCast(alignment),
-        context,
-    ) catch {
-        L.raiseErrorStr("Failed to create label", .{});
+    );
+
+    context.widgets.append(context.allocator, label) catch {
+        L.raiseErrorStr("Failed to append label", .{});
         return 0;
     };
 
-    return 0;
+    const label_ptr = &context.widgets.items[context.widgets.items.len - 1];
+    const userdata_ptr = L.newUserdata(*widgets.Label, 0);
+    userdata_ptr.* = label_ptr;
+
+    _ = L.getMetatableRegistry("Label");
+    L.setMetatable(-2);
+
+    return 1;
 }
 
 fn luaCreateWindow(L: *Lua) i32 {

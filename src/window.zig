@@ -47,7 +47,6 @@ pub const Callbacks = struct {
 pub const Window = struct {
     monitors: std.ArrayList(Monitor),
     bg_color: u32,
-    widgets: std.ArrayList(Label),
     callbacks: Callbacks,
     context: *Context,
     redraw: bool,
@@ -61,7 +60,6 @@ pub const Window = struct {
         outputs: []OutputInfo,
     ) !Window {
         var monitors =  try std.ArrayList(Monitor).initCapacity(context.allocator, 5);
-        const widgets = try std.ArrayList(Label).initCapacity(context.allocator, 10);
 
         for (outputs) |out_info| {
             // Check if we want to be as wide or tall as the screen
@@ -167,7 +165,6 @@ pub const Window = struct {
         return Window{
             .monitors = monitors,
             .bg_color = bg_color,
-            .widgets = widgets,
             .callbacks = callbacks,
             .context = context,
             .redraw = true,
@@ -190,7 +187,7 @@ pub const Window = struct {
             self.clear();
 
             for (self.monitors.items) |*monitor| {
-                for (self.widgets.items) |*widget| {
+                for (context.widgets.items) |*widget| {
                     widget.render(monitor, context);
                 }
                 monitor.surface.attach(monitor.buffer.buffer, 0, 0);
@@ -199,7 +196,7 @@ pub const Window = struct {
         }
     }
 
-    pub fn newLabel(self: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32, context: *Context) anyerror!*Label {
+    pub fn newLabel(_: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32) Label {
         const label = Label{
             .text = text,
             .font_size = font_size,
@@ -209,9 +206,7 @@ pub const Window = struct {
             .fg_color = 0xFFFFFFFF,
         };
 
-        try self.widgets.append(context.allocator, label);
-
-        return &self.widgets.items[self.widgets.items.len - 1];
+        return label;
     }
 
     pub fn toEdge(self: *Window, edge: i32) void {
