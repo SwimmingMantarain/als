@@ -53,16 +53,11 @@ pub const Label = struct {
         const descender: i64 = @divTrunc(face_size.descender, 64);
         const total_height: i64 = ascender - descender; // descender is negative
 
-        std.debug.print("Text dimensions: {}x{} (ascender: {}, descender: {})\n", 
-            .{ total_width, total_height, ascender, descender });
-
         const bg_width: u32 = @as(u32, @intCast(total_width)) + 2 * self.padding;
         const bg_height: u32 = @as(u32, @intCast(total_height)) + 2 * self.padding;
 
-        std.debug.print("{}, {}, {}, {}\n", .{ monitor.buffer.height, bg_height, ascender, descender });
-
-        const bg_x: i64 = @intCast((monitor.buffer.width - @as(u64, @intCast(bg_width))) / 2);
-        const bg_y: i64 = @intCast((monitor.buffer.height - @as(u64, @intCast(bg_height))) / 2);
+        const bg_x: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.width)) - @as(i64, @intCast(bg_width)), 2);
+        const bg_y: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.height)) - @as(i64, @intCast(bg_height)), 2);
 
         // Draw background
         var y: u32 = 0;
