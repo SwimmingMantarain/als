@@ -3,6 +3,7 @@ const zlua = @import("zlua");
 const Lua = zlua.Lua;
 const Context = @import("./context.zig").Context;
 const window = @import("./window.zig");
+const widgets = @import("./widgets.zig");
 
 pub fn init(L: *Lua, context: *Context) void {
     L.pushLightUserdata(context);
@@ -14,6 +15,9 @@ pub fn init(L: *Lua, context: *Context) void {
 fn registerModule(L: *Lua) void {
     // Create window object
     createWindowMetatable(L);
+
+    // Create label object
+    createLabelMetatable(L);
 
     L.createTable(0, 1);
 
@@ -37,6 +41,12 @@ fn registerModule(L: *Lua) void {
 
     L.pushInteger(0);
     L.setGlobal("CENTER");
+
+    L.pushInteger(-1);
+    L.setGlobal("SCREEN_WIDTH");
+    
+    L.pushInteger(-1);
+    L.setGlobal("SCREEN_HEIGHT");
 }
 
 fn createWindowMetatable(L: *Lua) void {
@@ -47,14 +57,21 @@ fn createWindowMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaSetCallback));
     L.setField(-2, "set_callback");
 
-    L.pushFunction(zlua.wrap(luaSetWindowColor));
-    L.setField(-2, "set_color");
-
-    L.pushFunction(zlua.wrap(luaDrawTextToWindow));
-    L.setField(-2, "draw_text");
-
     L.pushFunction(zlua.wrap(luaSetWindowEdge));
     L.setField(-2, "to_edge");
+
+    L.pushFunction(zlua.wrap(luaWindowNewLabel));
+    L.setField(-2, "new_label");
+
+    L.setField(-2, "__index");
+
+    L.pop(1);
+}
+
+fn createLabelMetatable(L: *Lua) void {
+    L.newMetatable("Label") catch return;
+
+    L.createTable(0, 1);
 
     L.setField(-2, "__index");
 
@@ -123,29 +140,9 @@ fn luaSetWindowEdge(L: *Lua) i32 {
     return 0;
 }
 
-fn luaSetWindowColor(L: *Lua) i32 {
+fn luaWindowNewLabel(L: *Lua) i32 {
     const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
     const window_ptr = window_ptr_ptr.*;
-
-    const color = L.toInteger(2) catch {
-        L.raiseErrorStr("Expected Integer/Hexadecimal value (0xFFFFFFFF, 0xARGB)", .{});
-        return 0;
-    };
-
-    window_ptr.setColor(@as(u32, @intCast(color)));
-
-    return 0;
-}
-
-fn luaDrawTextToWindow(L: *Lua) i32 {   
-    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
-    const window_ptr = window_ptr_ptr.*;
-
-    const x = L.toInteger(2) catch 0;
-    const y = L.toInteger(3) catch 0;
-    const text = L.toString(4) catch "";
-    const font = L.toString(5) catch "arial";
-    const size = L.toInteger(6) catch 16;
 
     const context = getContext(L) catch {
         _ = L.pushString("Failed to get context");
@@ -153,15 +150,37 @@ fn luaDrawTextToWindow(L: *Lua) i32 {
         return 0;
     };
 
-    window_ptr.drawText(@intCast(x), @intCast(y), text, font, @intCast(size), context);
+    const text = L.toString(2) catch "label";
+    const font_size = L.toInteger(3) catch 16;
+    const padding = L.toInteger(4) catch 0;
+    const alignment = L.toInteger(5) catch 0; // 0 -> center
 
-    return 0;
+    const label = window_ptr.newLabel(
+        text,
+        @intCast(font_size),
+        @intCast(padding), @intCast(alignment),
+    );
+
+    context.widgets.append(context.allocator, label) catch {
+        L.raiseErrorStr("Failed to append label", .{});
+        return 0;
+    };
+
+    const label_ptr = &context.widgets.items[context.widgets.items.len - 1];
+    const userdata_ptr = L.newUserdata(*widgets.Label, 0);
+    userdata_ptr.* = label_ptr;
+
+    _ = L.getMetatableRegistry("Label");
+    L.setMetatable(-2);
+
+    return 1;
 }
 
 fn luaCreateWindow(L: *Lua) i32 {
     const width = L.toInteger(1) catch 100;
     const height = L.toInteger(2) catch 100;
-    const onAllMonitors = L.toBoolean(3);
+    const bgcol = L.toInteger(3) catch 0xFF000000;
+    const onAllMonitors = L.toBoolean(4);
 
     const context = getContext(L) catch {
         _ = L.pushString("Failed to get context");
@@ -177,6 +196,7 @@ fn luaCreateWindow(L: *Lua) i32 {
     const w = window.Window.init(
         "als-window",
         @intCast(width), @intCast(height),
+        @intCast(bgcol),
         context,
         outputs,
     ) catch {

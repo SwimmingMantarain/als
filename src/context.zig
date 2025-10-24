@@ -9,6 +9,7 @@ const seat = wayland.client.seat;
 const zlua = @import("zlua");
 
 const window = @import("./window.zig");
+const widgets = @import("./widgets.zig");
 
 pub const xkb = @cImport({
     @cInclude("xkbcommon/xkbcommon.h");
@@ -34,6 +35,7 @@ pub const Context = struct {
     pointer: ?*wl.Pointer,
     keyboard: ?*wl.Keyboard,
     windows: std.ArrayList(window.Window),
+    widgets: std.ArrayList(widgets.Label),
     active_window: ?*window.Window,
     active_monitor: ?*window.Monitor,
     lua: *zlua.Lua,
@@ -58,7 +60,7 @@ pub const Context = struct {
             return error.FreeTypeInitFailed;
         }
 
-        const font_path = "/usr/share/fonts/TTF/M+1NerdFont-Regular.ttf";
+        const font_path = "/usr/share/fonts/Adwaita/AdwaitaMono-Regular.ttf";
         var ft_face: ft.FT_Face = undefined;
         if (ft.FT_New_Face(ft_lib, font_path, 0, &ft_face) == 1) {
             return error.FreeTypeFontFaceInitFailed;
@@ -75,6 +77,7 @@ pub const Context = struct {
             .pointer = null,
             .keyboard = null,
             .windows = try .initCapacity(gpa, 5),
+            .widgets = try .initCapacity(gpa, 10),
             .active_window = null,
             .active_monitor = null,
             .lua = lua,
@@ -100,6 +103,7 @@ pub const Context = struct {
         }
 
         self.outputs.deinit(self.allocator);
+        self.widgets.deinit(self.allocator);
         self.windows.deinit(self.allocator);
     }
 };
