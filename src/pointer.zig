@@ -16,13 +16,6 @@ const Lua = zlua.Lua;
 
 const handleCallback = @import("./lua-funcs.zig").handleCallback;
 
-const PointerEvent = enum {
-    Enter,
-    Leave,
-    Motion,
-    Button,
-};
-
 pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) void {
     switch (event) {
         .enter => |enter| {

@@ -5,6 +5,7 @@ const hb = @import("./context.zig").hb;
 
 const Context = @import("./context.zig").Context;
 const Monitor = @import("./window.zig").Monitor;
+const Callbacks = @import("./window.zig").Callbacks;
 
 pub const Label = struct {
     text: []const u8,
@@ -13,6 +14,7 @@ pub const Label = struct {
     padding: u32,
     bg_color: u32,
     fg_color: u32,
+    callbacks: Callbacks,
 
     pub fn render(self: *Label, monitor: *Monitor, context: *Context) void {
         if (ft.FT_Set_Pixel_Sizes(context.ft_face, @intCast(self.font_size), @intCast(self.font_size)) != 0) {

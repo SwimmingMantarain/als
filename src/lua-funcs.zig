@@ -54,7 +54,7 @@ fn createWindowMetatable(L: *Lua) void {
 
     L.createTable(0, 1);
 
-    L.pushFunction(zlua.wrap(luaSetCallback));
+    L.pushFunction(zlua.wrap(luaSetWindowCallback));
     L.setField(-2, "set_callback");
 
     L.pushFunction(zlua.wrap(luaSetWindowEdge));
@@ -73,6 +73,9 @@ fn createLabelMetatable(L: *Lua) void {
 
     L.createTable(0, 1);
 
+    L.pushFunction(zlua.wrap(luaSetLabelCallback));
+    L.setField(-2, "set_callback");
+
     L.setField(-2, "__index");
 
     L.pop(1);
@@ -85,7 +88,51 @@ fn getContext(L: *Lua) anyerror!*Context {
     return @ptrCast(@alignCast(context));
 }
 
-fn luaSetCallback(L: *Lua) i32 {
+fn luaSetLabelCallback(L: *Lua) i32 {
+    const label_ptr_ptr = L.checkUserdata(*widgets.Label, 1, "Label");
+    const label_ptr = label_ptr_ptr.*;
+
+    const callback_type = L.toString(2) catch {
+        L.raiseErrorStr("Expected string as 2nd arg", .{});
+        return 0;
+    };
+
+    if (!L.isFunction(3)) {
+        L.raiseErrorStr("Expected func as 3rd arg", .{});
+        return 0;
+    }
+
+    L.pushValue(3);
+    const ref = L.ref(zlua.registry_index) catch {
+        L.raiseErrorStr("Failed to store callback", .{});
+        return 0;
+    };
+
+    const callbacks_type = @typeInfo(window.Callbacks).@"struct";
+    var callback_found = false;
+
+    inline for (callbacks_type.fields) |field| {
+        if (std.mem.eql(u8, callback_type, field.name)) {
+            if (@field(label_ptr.callbacks, field.name)) |old_ref| {
+                L.unref(zlua.registry_index, old_ref);
+            }
+
+            @field(label_ptr.callbacks, field.name) = ref;
+            callback_found = true;
+            break;
+        }
+    }
+
+    if (!callback_found) {
+        L.unref(zlua.registry_index, ref);
+        L.raiseErrorStr("Unknown callback type", .{});
+        return 0;
+    }
+
+    return 0;
+}
+
+fn luaSetWindowCallback(L: *Lua) i32 {
     const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
     const window_ptr = window_ptr_ptr.*;
 

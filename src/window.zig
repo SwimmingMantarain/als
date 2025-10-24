@@ -197,6 +197,15 @@ pub const Window = struct {
     }
 
     pub fn newLabel(_: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32) Label {
+        const callbacks = Callbacks{
+            .leftpress = null,
+            .leftrelease = null,
+            .mouseenter = null,
+            .mouseleave = null,
+            .mousemotion = null,
+            .key = null,
+        };
+
         const label = Label{
             .text = text,
             .font_size = font_size,
@@ -204,6 +213,7 @@ pub const Window = struct {
             .padding = padding,
             .bg_color = 0xFF119911,
             .fg_color = 0xFFFFFFFF,
+            .callbacks = callbacks,
         };
 
         return label;
