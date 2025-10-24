@@ -53,12 +53,6 @@ fn createWindowMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaSetCallback));
     L.setField(-2, "set_callback");
 
-    L.pushFunction(zlua.wrap(luaSetWindowColor));
-    L.setField(-2, "set_color");
-
-    L.pushFunction(zlua.wrap(luaDrawTextToWindow));
-    L.setField(-2, "draw_text");
-
     L.pushFunction(zlua.wrap(luaSetWindowEdge));
     L.setField(-2, "to_edge");
 
@@ -132,20 +126,6 @@ fn luaSetWindowEdge(L: *Lua) i32 {
     return 0;
 }
 
-fn luaSetWindowColor(L: *Lua) i32 {
-    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
-    const window_ptr = window_ptr_ptr.*;
-
-    const color = L.toInteger(2) catch {
-        L.raiseErrorStr("Expected Integer/Hexadecimal value (0xFFFFFFFF, 0xARGB)", .{});
-        return 0;
-    };
-
-    window_ptr.setColor(@as(u32, @intCast(color)));
-
-    return 0;
-}
-
 fn luaWindowNewLabel(L: *Lua) i32 {
     const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
     const window_ptr = window_ptr_ptr.*;
@@ -163,7 +143,7 @@ fn luaWindowNewLabel(L: *Lua) i32 {
     const padding = L.toInteger(6) catch 0;
     const alignment = L.toInteger(7) catch 0; // 0 -> center
 
-    const label = window_ptr.newLabel(
+    _ = window_ptr.newLabel(
         text,
         @intCast(font_size),
         @intCast(width), @intCast(height),

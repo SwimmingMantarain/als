@@ -47,7 +47,7 @@ pub const Callbacks = struct {
 pub const Window = struct {
     monitors: std.ArrayList(Monitor),
     bg_color: u32,
-    widgets: std.Arraylist(Label)
+    widgets: std.ArrayList(Label),
     callbacks: Callbacks,
     context: *Context,
 
@@ -60,7 +60,7 @@ pub const Window = struct {
         outputs: []OutputInfo,
     ) !Window {
         var monitors =  try std.ArrayList(Monitor).initCapacity(context.allocator, 5);
-        var widgets = try std.ArrayList(Label).initCapacity(context.allocator, 10);
+        const widgets = try std.ArrayList(Label).initCapacity(context.allocator, 10);
 
         for (outputs) |out_info| {
             // Check if we want to be as wide or tall as the screen
@@ -197,9 +197,6 @@ pub const Window = struct {
         const wb = WidgetBuffer{
             .width = width + padding * 2,
             .height = height + padding * 2,
-            .stride = self.width,
-            .offset_x = self.width / 2 - width / 2 - padding,
-            .offset_y = self.height / 2 - height / 2 - paddding,
         };
 
         const label = Label{
@@ -213,7 +210,7 @@ pub const Window = struct {
 
         try self.widgets.append(context.allocator, label);
 
-        return &self.widget.items[self.widget.items.len - 1];
+        return &self.widgets.items[self.widgets.items.len - 1];
     }
 
     pub fn toEdge(self: *Window, edge: i32) void {

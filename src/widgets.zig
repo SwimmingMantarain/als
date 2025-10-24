@@ -1,15 +1,16 @@
+const std = @import("std");
+
 const ft = @import("./context.zig").ft;
 const hb = @import("./context.zig").hb;
 
+const Context = @import("./context").Context;
+const Window = @import("./window.zig").Window;
 
 pub const WidgetBuffer = struct {
     width: u32,
     height: u32,
-    stride: u32, // parent buffer width
-    offset_x: u32,
-    offset_y: u32,
 
-    pub fn setPixel(self: *WidgetBuffer, x: u64, y: u64, color: u32, pixels: [*]u32) void {
+    pub fn setPixel(self: *WidgetBuffer, x: u64, y: u64, color: u32, pixels: [*]u32, parent_width: u32,) void {
         const abs_x = x + self.offset_x;
         const abs_y = y + self.offset_y;
 
@@ -18,7 +19,7 @@ pub const WidgetBuffer = struct {
             pixels[idx] = color; // ARGB
         }
     }
-}
+};
 
 pub const Label = struct {
     wb: WidgetBuffer,
@@ -28,7 +29,7 @@ pub const Label = struct {
     bg_color: u32,
     fg_color: u32,
 
-    pub const render(self: *Label, pixels: [*]u32, context: *Context) void {
+    pub fn render(self: *Label, pixels: [*]u32, context: *Context) void {
         if (ft.FT_Set_Pixel_Sizes(context.ft_face, @intCast(self.font_size), @intCast(self.font_size)) != 0) {
             std.debug.print("Failed to set character size\n", .{});
             return;
