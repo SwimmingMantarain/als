@@ -206,7 +206,11 @@ fn luaWindowNewLabel(L: *Lua) i32 {
         text,
         @intCast(font_size),
         @intCast(padding), @intCast(alignment),
-    );
+        context,
+    ) catch {
+        L.raiseErrorStr("Failed to create label", .{});
+        return 0;
+    };
 
     const widget = widgets.Widget{
         .label = label,

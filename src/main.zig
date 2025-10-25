@@ -59,7 +59,7 @@ pub fn main() anyerror!void {
         if (display.dispatch() != .SUCCESS) return error.DispatchFailed;
 
         for (context.windows.items) |*w| {
-            try w.update(display, &context);
+            try w.update(display);
         }
 
         std.Thread.sleep(16_000_000); // ~60fps (16ms)

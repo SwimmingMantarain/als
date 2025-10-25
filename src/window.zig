@@ -188,7 +188,7 @@ pub const Window = struct {
         self.widgets.deinit(allocator);
     }
 
-    pub fn update(self: *Window, display: *wl.Display, context: *Context) anyerror!void {
+    pub fn update(self: *Window, display: *wl.Display) anyerror!void {
         if (display.flush() != .SUCCESS) return error.FlushFailed;
 
         if (self.redraw) {
@@ -197,7 +197,7 @@ pub const Window = struct {
 
             for (self.monitors.items) |*monitor| {
                 for (self.widgets.items) |*widget| {
-                    widget.render(monitor, context);
+                    widget.render(monitor);
                 }
                 monitor.surface.attach(monitor.buffer.buffer, 0, 0);
                 monitor.surface.commit();
@@ -205,25 +205,16 @@ pub const Window = struct {
         }
     }
 
-    pub fn newLabel(_: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32) Label {
-        const callbacks = Callbacks{
-            .leftpress = null,
-            .leftrelease = null,
-            .mouseenter = null,
-            .mouseleave = null,
-            .mousemotion = null,
-            .key = null,
-        };
-
-        const label = Label{
-            .text = text,
-            .font_size = font_size,
-            .alignment = alignment,
-            .padding = padding,
-            .bg_color = 0xFF119911,
-            .fg_color = 0xFFFFFFFF,
-            .callbacks = callbacks,
-        };
+    pub fn newLabel(_: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32, context: *Context) anyerror!Label {
+        const label = Label.new(
+            text,
+            font_size,
+            padding,
+            0xFFFFFFFF, // foreground
+            0xFF119911, // background
+            alignment,
+            context,
+        ) catch |err| return err;
 
         return label;
     }
