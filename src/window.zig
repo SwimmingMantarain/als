@@ -48,7 +48,7 @@ pub const Callbacks = struct {
 
 pub const Window = struct {
     monitors: std.ArrayList(Monitor),
-    widgets: std.ArrayList(Widget),
+    widgets: std.ArrayList(*Widget),
     bg_color: u32,
     callbacks: Callbacks,
     context: *Context,
@@ -63,7 +63,7 @@ pub const Window = struct {
         outputs: []OutputInfo,
     ) !Window {
         var monitors =  try std.ArrayList(Monitor).initCapacity(context.allocator, 5);
-        const widgets = try std.ArrayList(Widget).initCapacity(context.allocator, 10);
+        const widgets = try std.ArrayList(*Widget).initCapacity(context.allocator, 10);
 
         for (outputs) |out_info| {
             // Check if we want to be as wide or tall as the screen
@@ -196,7 +196,7 @@ pub const Window = struct {
             self.clear();
 
             for (self.monitors.items) |*monitor| {
-                for (self.widgets.items) |*widget| {
+                for (self.widgets.items) |widget| {
                     widget.render(monitor);
                 }
                 monitor.surface.attach(monitor.buffer.buffer, 0, 0);

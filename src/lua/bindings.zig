@@ -10,7 +10,8 @@ const createWidgetMetatable = @import("./api_widget.zig").createWidgetMetatable;
 
 
 pub fn init(L: *Lua, context: *Context) void {
-    L.pushLightUserdata(context);
+    const ud = L.newUserdata(*Context, 0);
+    ud.* = context;
     L.setField(zlua.registry_index, "context");
 
     registerModule(L);
@@ -54,5 +55,5 @@ pub fn getContext(L: *Lua) anyerror!*Context {
     _ = L.getField(zlua.registry_index, "context");
     const context = try L.toUserdata(*Context, -1);
     L.pop(1);
-    return @ptrCast(@alignCast(context));
+    return @ptrCast(@alignCast(context.*));
 }

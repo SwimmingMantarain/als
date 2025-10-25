@@ -58,7 +58,7 @@ pub fn main() anyerror!void {
     while (true) {
         if (display.dispatch() != .SUCCESS) return error.DispatchFailed;
 
-        for (context.windows.items) |*w| {
+        for (context.windows.items) |w| {
             try w.update(display);
         }
 

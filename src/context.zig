@@ -34,7 +34,7 @@ pub const Context = struct {
     seat: ?*wl.Seat,
     pointer: ?*wl.Pointer,
     keyboard: ?*wl.Keyboard,
-    windows: std.ArrayList(window.Window),
+    windows: std.ArrayList(*window.Window),
     active_window: ?*window.Window,
     active_monitor: ?*window.Monitor,
     lua: *zlua.Lua,

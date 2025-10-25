@@ -65,14 +65,19 @@ fn luaWindowNewLabel(L: *Lua) i32 {
         .label = label,
     };
 
-    window_ptr.widgets.append(context.allocator, widget) catch {
+    const w_ptr = context.allocator.create(widgets.Widget) catch {
+        L.raiseErrorStr("Failed to allocatoe memory for new Widget", .{});
+        return 0;
+    };
+    w_ptr.* = widget;
+
+    window_ptr.widgets.append(context.allocator, w_ptr) catch {
         L.raiseErrorStr("Failed to append label", .{});
         return 0;
     };
 
-    const widget_ptr = &window_ptr.widgets.items[window_ptr.widgets.items.len - 1];
     const userdata_ptr = L.newUserdata(*widgets.Widget, 0);
-    userdata_ptr.* = widget_ptr;
+    userdata_ptr.* = w_ptr;
 
     _ = L.getMetatableRegistry("Widget");
     L.setMetatable(-2);
