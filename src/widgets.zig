@@ -7,6 +7,16 @@ const Context = @import("./context.zig").Context;
 const Monitor = @import("./window.zig").Monitor;
 const Callbacks = @import("./window.zig").Callbacks;
 
+pub const Widget = union(enum) {
+    label: Label,
+
+    pub fn render(self: *Widget, monitor: *Monitor, context: *Context) void {
+        switch (self.*) {
+            .label => |*l| l.render(monitor, context),
+        }
+    }
+};
+
 pub const Label = struct {
     text: []const u8,
     font_size: u32,

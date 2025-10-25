@@ -35,7 +35,6 @@ pub const Context = struct {
     pointer: ?*wl.Pointer,
     keyboard: ?*wl.Keyboard,
     windows: std.ArrayList(window.Window),
-    widgets: std.ArrayList(widgets.Label),
     active_window: ?*window.Window,
     active_monitor: ?*window.Monitor,
     lua: *zlua.Lua,
@@ -77,7 +76,6 @@ pub const Context = struct {
             .pointer = null,
             .keyboard = null,
             .windows = try .initCapacity(gpa, 5),
-            .widgets = try .initCapacity(gpa, 10),
             .active_window = null,
             .active_monitor = null,
             .lua = lua,
@@ -102,8 +100,15 @@ pub const Context = struct {
             xkb.xkb_context_unref(ctx);
         }
 
+        if (self.ft_face) |ft_face| {
+            _ = ft.FT_Done_Face(ft_face);
+        }
+
+        if (self.ft) |lib| {
+            _ = ft.FT_Done_FreeType(lib);
+        }
+
         self.outputs.deinit(self.allocator);
-        self.widgets.deinit(self.allocator);
         self.windows.deinit(self.allocator);
     }
 };

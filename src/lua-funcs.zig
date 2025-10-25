@@ -208,14 +208,18 @@ fn luaWindowNewLabel(L: *Lua) i32 {
         @intCast(padding), @intCast(alignment),
     );
 
-    context.widgets.append(context.allocator, label) catch {
+    const widget = widgets.Widget{
+        .label = label,
+    };
+
+    window_ptr.widgets.append(context.allocator, widget) catch {
         L.raiseErrorStr("Failed to append label", .{});
         return 0;
     };
 
-    const label_ptr = &context.widgets.items[context.widgets.items.len - 1];
+    const widget_ptr = &window_ptr.widgets.items[window_ptr.widgets.items.len - 1];
     const userdata_ptr = L.newUserdata(*widgets.Label, 0);
-    userdata_ptr.* = label_ptr;
+    userdata_ptr.* = &widget_ptr.label;
 
     _ = L.getMetatableRegistry("Label");
     L.setMetatable(-2);

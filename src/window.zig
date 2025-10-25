@@ -1,5 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
+const Allocator = mem.Allocator;
 const posix = std.posix;
 
 const wayland = @import("wayland");
@@ -12,6 +13,7 @@ const ft = @import("./context.zig").ft;
 const hb = @import("./context.zig").hb;
 
 const Label = @import("./widgets.zig").Label;
+const Widget = @import("./widgets.zig").Widget;
 const WidgetBuffer = @import("./widgets.zig").WidgetBuffer;
 
 pub const OutputInfo = struct {
@@ -46,6 +48,7 @@ pub const Callbacks = struct {
 
 pub const Window = struct {
     monitors: std.ArrayList(Monitor),
+    widgets: std.ArrayList(Widget),
     bg_color: u32,
     callbacks: Callbacks,
     context: *Context,
@@ -60,6 +63,7 @@ pub const Window = struct {
         outputs: []OutputInfo,
     ) !Window {
         var monitors =  try std.ArrayList(Monitor).initCapacity(context.allocator, 5);
+        const widgets = try std.ArrayList(Widget).initCapacity(context.allocator, 10);
 
         for (outputs) |out_info| {
             // Check if we want to be as wide or tall as the screen
@@ -164,6 +168,7 @@ pub const Window = struct {
 
         return Window{
             .monitors = monitors,
+            .widgets = widgets,
             .bg_color = bg_color,
             .callbacks = callbacks,
             .context = context,
@@ -171,12 +176,16 @@ pub const Window = struct {
         };
     }
 
-    pub fn deinit(self: *Window) void {
+    pub fn deinit(self: *Window, allocator: *Allocator) void {
         for (self.monitors.items) |*monitor| {
+            const size = monitor.buffer.width * monitor.buffer.height;
+            posix.munmap(@as([*]align(mem.page_size) u8, @ptrCast(monitor.buffer.pixels))[0..size]);
             monitor.layer_surface.destroy();
             monitor.surface.destroy();
             monitor.buffer.buffer.destroy();
         }
+        self.monitors.deinit(allocator);
+        self.widgets.deinit(allocator);
     }
 
     pub fn update(self: *Window, display: *wl.Display, context: *Context) anyerror!void {
@@ -187,7 +196,7 @@ pub const Window = struct {
             self.clear();
 
             for (self.monitors.items) |*monitor| {
-                for (context.widgets.items) |*widget| {
+                for (self.widgets.items) |*widget| {
                     widget.render(monitor, context);
                 }
                 monitor.surface.attach(monitor.buffer.buffer, 0, 0);
