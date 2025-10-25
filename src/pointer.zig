@@ -14,19 +14,12 @@ const Context = @import("./context.zig").Context;
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
 
-const handleCallback = @import("./lua-funcs.zig").handleCallback;
-
-const PointerEvent = enum {
-    Enter,
-    Leave,
-    Motion,
-    Button,
-};
+const handleCallback = @import("./lua/callbacks.zig").handleCallback;
 
 pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) void {
     switch (event) {
         .enter => |enter| {
-            for (context.windows.items) |*w| {
+            for (context.windows.items) |w| {
                 for (w.monitors.items) |*m| {
                     if (m.surface == enter.surface) {
                         context.active_window = w;
@@ -40,7 +33,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
             }
         },
         .leave => |leave| {
-            for (context.windows.items) |*w| {
+            for (context.windows.items) |w| {
                 for (w.monitors.items) |*m| {
                     if (m.surface == leave.surface) {
                         if (context.active_monitor) |active| {
