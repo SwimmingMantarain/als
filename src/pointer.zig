@@ -14,7 +14,7 @@ const Context = @import("./context.zig").Context;
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
 
-const handleCallback = @import("./lua-funcs.zig").handleCallback;
+const handleCallback = @import("./lua/callbacks.zig").handleCallback;
 
 pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) void {
     switch (event) {

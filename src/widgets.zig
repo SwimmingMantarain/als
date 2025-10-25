@@ -17,6 +17,12 @@ pub const Widget = union(enum) {
             .label => |*l| l.render(monitor),
         }
     }
+
+    pub fn callbacks(self: *Widget) *Callbacks {
+        switch (self.*) {
+            .label => |*l| return &l.callbacks,
+        }
+    }
 };
 
 pub const Label = struct {

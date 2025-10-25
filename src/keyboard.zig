@@ -17,7 +17,7 @@ const Lua = zlua.Lua;
 
 const xkb = @import("./context.zig").xkb;
 
-const handleCallback = @import("./lua-funcs.zig").handleCallback;
+const handleCallback = @import("./lua/callbacks.zig").handleCallback;
 
 pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Context) void {
     switch (event) {

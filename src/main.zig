@@ -15,7 +15,7 @@ const Context = @import("./context.zig").Context;
 
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
-const lapi = @import("./lua-funcs.zig");
+const als = @import("./lua/bindings.zig");
 
 const pointerListener = @import("./pointer.zig").pointerListener;
 const keyboardListener = @import("./keyboard.zig").keyboardListener;
@@ -35,7 +35,7 @@ pub fn main() anyerror!void {
     var context = try Context.init(allocator, display, lua);
     defer context.deinit();
 
-    lapi.init(lua, &context); // Register my API
+    als.init(lua, &context); // Register my API
 
     registry.setListener(*Context, registryListener, &context);
 
