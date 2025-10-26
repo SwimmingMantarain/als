@@ -189,6 +189,13 @@ pub const Window = struct {
         }
     }
 
+    pub fn hit(self: *Window, x: f64, y: f64) ?*Widget {
+        for (self.widgets.items) |widget| {
+            if (widget.contains(x, y)) return widget;
+        }
+        return null;
+    }
+
     pub fn newLabel(_: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32, context: *Context) anyerror!Label {
         const label = Label.new(
             text,

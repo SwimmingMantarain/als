@@ -17,12 +17,22 @@ pub const Widget = union(enum) {
             .label => |*l| l.render(monitor),
         }
     }
+
+    pub fn contains(self: *Widget, x: f64, y: f64) bool {
+        switch (self.*) {
+            .label => |*l| {
+                return l.contains(x, y);
+            },
+        }
+    }
 };
 
 pub const Label = struct {
     text: Text,
     tr: TextRenderer,
     alignment: u32,
+    x: f64,
+    y: f64,
     callbacks: callbacks.CallbackHandler,
     context: *Context,
 
@@ -32,13 +42,26 @@ pub const Label = struct {
             .text = label_text,
             .tr = TextRenderer{},
             .alignment = alignment,
+            .x = 0, // Will be set after render
+            .y = 0,
             .callbacks = callbacks.CallbackHandler.init(context.allocator, context.lua),
             .context = context,
         };
     }
 
+    pub fn contains(self: *Label, x: f64, y: f64) bool {
+        return (x > self.x and
+                x < self.x + @as(f64, @floatFromInt(self.text.total_width)) and
+                y > self.y and
+                y < self.y + @as(f64, @floatFromInt(self.text.total_height)));
+    }
+
     pub fn render(self: *Label, monitor: *Monitor) void {
         self.tr.renderText(self.text, self.alignment, monitor, self.context);
+
+        const bbox = self.tr.boundingBox(self.text, monitor);
+        self.x = @floatFromInt(bbox[0]);
+        self.y = @floatFromInt(bbox[1]);
     }
 
     pub fn deinit(self: *Label) void {

@@ -80,7 +80,7 @@ pub fn luaSetWindowCallback(L: *Lua) i32 {
     return 0;
 }
 
-pub fn handleCallback(
+pub fn handleWindowCallback(
     active_window: *window.Window,
     callback: i32,
     context: *Context,
@@ -92,6 +92,51 @@ pub fn handleCallback(
     userdata_ptr.* = active_window;
 
     _ = context.lua.getMetatableRegistry("Window");
+    context.lua.setMetatable(-2);
+
+    const fields = @typeInfo(@TypeOf(extra_args)).@"struct".fields;
+    var total_args: i32 = 1;
+
+    inline for (fields) |field| {
+        const value = @field(extra_args, field.name);
+        switch (@typeInfo(field.type)) {
+            .int => context.lua.pushInteger(value),
+            .float => context.lua.pushNumber(value),
+            .array => context.lua.pushString(value),
+            else => @compileError("Unsupported type for Lua callback"),
+        }
+        total_args += 1;
+    }
+
+    const args = zlua.Lua.ProtectedCallArgs {
+        .args = total_args,
+        .results = 0,
+        .msg_handler = 0,
+    };
+
+    context.lua.protectedCall(args) catch |err| {
+        std.debug.print("Lua callback error: {}\n", .{err});
+        if (context.lua.isString(-1)) {
+            const err_msg = context.lua.toString(-1) catch "unkown";
+            std.debug.print("Error message: {s}\n", .{err_msg});
+        }
+        context.lua.pop(1);
+    };
+}
+
+
+pub fn handleWidgetCallback(
+    widget: *widgets.Widget,
+    callback: i32,
+    context: *Context,
+    extra_args: anytype,
+    ) void {
+    _ = context.lua.rawGetIndex(zlua.registry_index, callback);
+
+    const userdata_ptr = context.lua.newUserdata(*widgets.Widget, 0);
+    userdata_ptr.* = widget;
+
+    _ = context.lua.getMetatableRegistry("Widget");
     context.lua.setMetatable(-2);
 
     const fields = @typeInfo(@TypeOf(extra_args)).@"struct".fields;

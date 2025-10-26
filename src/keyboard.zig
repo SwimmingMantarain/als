@@ -17,7 +17,7 @@ const Lua = zlua.Lua;
 
 const xkb = @import("./context.zig").xkb;
 
-const handleCallback = @import("./lua/callbacks.zig").handleCallback;
+const handleWindowCallback = @import("./lua/callbacks.zig").handleWindowCallback;
 
 pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Context) void {
     switch (event) {
@@ -51,7 +51,7 @@ pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Con
                     const keysym = xkb.xkb_state_key_get_one_sym(context.xkb_state, key.key + 8); // +8 for linux evdev
                     const keyutf32 = xkb.xkb_keysym_to_utf32(keysym);
 
-                    handleCallback(active_window, callback, context, .{ keyutf32 });
+                    handleWindowCallback(active_window, callback, context, .{ keyutf32 });
                 }
             }
         },

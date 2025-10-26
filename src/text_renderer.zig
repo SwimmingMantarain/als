@@ -85,6 +85,13 @@ pub const TextRenderer = struct {
         };
     }
 
+    pub fn boundingBox(_: *TextRenderer, text: Text, monitor: *Monitor) [2]i64 {
+        const bg_x: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.width)) - @as(i64, @intCast(text.bg_w)), 2);
+        const bg_y: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.height)) - @as(i64, @intCast(text.bg_h)), 2);
+
+        return .{bg_x, bg_y} ;
+    }
+
     pub fn renderText(self: *TextRenderer, text: Text, alignment: u32, monitor: *Monitor, context: *Context) void {
         const bg_x: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.width)) - @as(i64, @intCast(text.bg_w)), 2);
         const bg_y: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.height)) - @as(i64, @intCast(text.bg_h)), 2);

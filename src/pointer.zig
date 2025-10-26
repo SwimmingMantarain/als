@@ -14,7 +14,8 @@ const Context = @import("./context.zig").Context;
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
 
-const handleCallback = @import("./lua/callbacks.zig").handleCallback;
+const handleWindowCallback = @import("./lua/callbacks.zig").handleWindowCallback;
+const handleWidgetCallback = @import("./lua/callbacks.zig").handleWidgetCallback;
 
 pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) void {
     switch (event) {
@@ -26,7 +27,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                         context.active_monitor = m;
 
                         if (w.callbacks.get(.mouseenter)) |callback| {
-                            handleCallback(w, callback, context, .{});
+                            handleWindowCallback(w, callback, context, .{});
                         }
                         break;
                     }
@@ -44,17 +45,25 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                             }
                         }
                         if (w.callbacks.get(.mouseleave)) |callback| {
-                            handleCallback(w, callback, context, .{});
+                            handleWindowCallback(w, callback, context, .{});
                         }
                         break;
                     }
                 }
             }
         },
-        .motion => {
+        .motion => |motion| {
             if (context.active_window) |active_window| {
-                if (active_window.callbacks.get(.mousemotion)) |callback| {
-                    handleCallback(active_window, callback, context, .{});
+                if (active_window.hit(motion.surface_x.toDouble(), motion.surface_y.toDouble())) |widget| {
+                    switch (widget.*) {
+                        .label => |*l| {
+                            if (l.callbacks.get(.mousemotion)) |callback| {
+                                handleWidgetCallback(widget, callback, context, .{motion.surface_x.toInt(), motion.surface_y.toInt()});
+                            }
+                        },
+                    }
+                } else if (active_window.callbacks.get(.mousemotion)) |callback| {
+                    handleWindowCallback(active_window, callback, context, .{});
                 }
             }
         },
@@ -65,11 +74,11 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
 
                 if (btn == 272 and state == .pressed) { // Left click and pressed
                     if (active_window.callbacks.get(.leftpress)) |callback| {
-                        handleCallback(active_window, callback, context, .{});
+                        handleWindowCallback(active_window, callback, context, .{});
                     }
                 } else if (btn == 272 and state == .released) { // Left click and released
                     if (active_window.callbacks.get(.leftrelease)) |callback| {
-                        handleCallback(active_window, callback, context, .{});
+                        handleWindowCallback(active_window, callback, context, .{});
                     }
                 }
             }
