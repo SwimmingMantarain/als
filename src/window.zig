@@ -15,6 +15,7 @@ const hb = @import("./context.zig").hb;
 const Label = @import("./widgets.zig").Label;
 const Widget = @import("./widgets.zig").Widget;
 const WidgetBuffer = @import("./widgets.zig").WidgetBuffer;
+const callbacks = @import("./callbacks.zig");
 
 pub const OutputInfo = struct {
     output: *wl.Output,
@@ -37,20 +38,11 @@ const Buffer = struct {
     pixel_count: usize,
 };
 
-pub const Callbacks = struct {
-    leftpress: ?i32,
-    leftrelease: ?i32,
-    mouseenter: ?i32,
-    mouseleave: ?i32,
-    mousemotion: ?i32,
-    key: ?i32,
-};
-
 pub const Window = struct {
     monitors: std.ArrayList(Monitor),
     widgets: std.ArrayList(*Widget),
     bg_color: u32,
-    callbacks: Callbacks,
+    callbacks: callbacks.CallbackHandler,
     context: *Context,
     redraw: bool,
 
@@ -157,26 +149,18 @@ pub const Window = struct {
             };
         }
 
-        const callbacks = Callbacks{
-            .leftpress = null,
-            .leftrelease = null,
-            .mouseenter = null,
-            .mouseleave = null,
-            .mousemotion = null,
-            .key = null,
-        };
-
         return Window{
             .monitors = monitors,
+            .callbacks = callbacks.CallbackHandler.init(context.allocator, context.lua),
             .widgets = widgets,
             .bg_color = bg_color,
-            .callbacks = callbacks,
             .context = context,
             .redraw = true,
         };
     }
 
     pub fn deinit(self: *Window, allocator: *Allocator) void {
+        self.callbacks.deinit();
         for (self.monitors.items) |*monitor| {
             const size = monitor.buffer.width * monitor.buffer.height;
             posix.munmap(@as([*]align(mem.page_size) u8, @ptrCast(monitor.buffer.pixels))[0..size]);

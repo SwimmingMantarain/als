@@ -47,7 +47,7 @@ pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Con
         },
         .key => |key| {
             if (context.active_window) |active_window| {
-                if (active_window.callbacks.key) |callback| {
+                if (active_window.callbacks.get(.key)) |callback| {
                     const keysym = xkb.xkb_state_key_get_one_sym(context.xkb_state, key.key + 8); // +8 for linux evdev
                     const keyutf32 = xkb.xkb_keysym_to_utf32(keysym);
 

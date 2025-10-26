@@ -24,7 +24,8 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                     if (m.surface == enter.surface) {
                         context.active_window = w;
                         context.active_monitor = m;
-                        if (w.callbacks.mouseenter) |callback| {
+
+                        if (w.callbacks.get(.mouseenter)) |callback| {
                             handleCallback(w, callback, context, .{});
                         }
                         break;
@@ -42,7 +43,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                                 context.active_monitor = null;
                             }
                         }
-                        if (w.callbacks.mouseleave) |callback| {
+                        if (w.callbacks.get(.mouseleave)) |callback| {
                             handleCallback(w, callback, context, .{});
                         }
                         break;
@@ -52,7 +53,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
         },
         .motion => {
             if (context.active_window) |active_window| {
-                if (active_window.callbacks.mousemotion) |callback| {
+                if (active_window.callbacks.get(.mousemotion)) |callback| {
                     handleCallback(active_window, callback, context, .{});
                 }
             }
@@ -63,11 +64,11 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                 const state = button.state;
 
                 if (btn == 272 and state == .pressed) { // Left click and pressed
-                    if (active_window.callbacks.leftpress) |callback| {
+                    if (active_window.callbacks.get(.leftpress)) |callback| {
                         handleCallback(active_window, callback, context, .{});
                     }
                 } else if (btn == 272 and state == .released) { // Left click and released
-                    if (active_window.callbacks.leftrelease) |callback| {
+                    if (active_window.callbacks.get(.leftrelease)) |callback| {
                         handleCallback(active_window, callback, context, .{});
                     }
                 }
