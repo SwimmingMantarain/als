@@ -189,9 +189,9 @@ pub const Window = struct {
         }
     }
 
-    pub fn hit(self: *Window, x: f64, y: f64) ?*Widget {
+    pub fn hit(self: *Window, x: f64, y: f64, monitor: *Monitor) ?*Widget {
         for (self.widgets.items) |widget| {
-            if (widget.contains(x, y)) return widget;
+            if (widget.contains(x, y, monitor)) return widget;
         }
         return null;
     }

@@ -54,16 +54,18 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
         },
         .motion => |motion| {
             if (context.active_window) |active_window| {
-                if (active_window.hit(motion.surface_x.toDouble(), motion.surface_y.toDouble())) |widget| {
-                    switch (widget.*) {
-                        .label => |*l| {
-                            if (l.callbacks.get(.mousemotion)) |callback| {
-                                handleWidgetCallback(widget, callback, context, .{motion.surface_x.toInt(), motion.surface_y.toInt()});
-                            }
-                        },
+                if (context.active_monitor) |active_monitor| {
+                    if (active_window.hit(motion.surface_x.toDouble(), motion.surface_y.toDouble(), active_monitor)) |widget| {
+                        switch (widget.*) {
+                            .label => |*l| {
+                                if (l.callbacks.get(.mousemotion)) |callback| {
+                                    handleWidgetCallback(widget, callback, context, .{motion.surface_x.toInt(), motion.surface_y.toInt()});
+                                }
+                            },
+                        }
+                    } else if (active_window.callbacks.get(.mousemotion)) |callback| {
+                        handleWindowCallback(active_window, callback, context, .{});
                     }
-                } else if (active_window.callbacks.get(.mousemotion)) |callback| {
-                    handleWindowCallback(active_window, callback, context, .{});
                 }
             }
         },
