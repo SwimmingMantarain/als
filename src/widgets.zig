@@ -4,7 +4,7 @@ const ft = @import("./context.zig").ft;
 const hb = @import("./context.zig").hb;
 
 const Context = @import("./context.zig").Context;
-const Monitor = @import("./window.zig").Monitor;
+const Buffer = @import("./window.zig").Buffer;
 const callbacks = @import("./callbacks.zig");
 const Text = @import("./text_renderer.zig").Text;
 const TextRenderer = @import("./text_renderer.zig").TextRenderer;
@@ -12,16 +12,16 @@ const TextRenderer = @import("./text_renderer.zig").TextRenderer;
 pub const Widget = union(enum) {
     label: Label,
 
-    pub fn render(self: *Widget, monitor: *Monitor) void {
+    pub fn render(self: *Widget, buffer: *Buffer) void {
         switch (self.*) {
-            .label => |*l| l.render(monitor),
+            .label => |*l| l.render(buffer),
         }
     }
 
-    pub fn contains(self: *Widget, x: f64, y: f64, monitor: *Monitor) bool {
+    pub fn contains(self: *Widget, x: f64, y: f64, buffer: *Buffer) bool {
         switch (self.*) {
             .label => |*l| {
-                return l.contains(x, y, monitor);
+                return l.contains(x, y, buffer);
             },
         }
     }
@@ -34,19 +34,21 @@ pub const Label = struct {
     callbacks: callbacks.CallbackHandler,
     context: *Context,
 
-    pub fn new(text: []const u8, font_size: u32, padding: u32, fg: u32, bg: u32, alignment: u32, context: *Context) anyerror!Label {
+    pub fn new(text: []const u8, font_size: u32, padding: u32, fg: u32, bg: u32, alignment: u32, context: *Context) anyerror!Widget{
         const label_text = TextRenderer.newText(text, font_size, padding, fg, bg, context) catch |err| return err;
-        return Label {
+        const label = Label {
             .text = label_text,
             .tr = TextRenderer{},
             .alignment = alignment,
             .callbacks = callbacks.CallbackHandler.init(context.allocator, context.lua),
             .context = context,
         };
+
+        return Widget { .label = label };
     }
 
-    pub fn contains(self: *Label, x: f64, y: f64, monitor: *Monitor) bool {
-        const bbox = self.tr.boundingBox(self.text, monitor);
+    pub fn contains(self: *Label, x: f64, y: f64, buffer: *Buffer) bool {
+        const bbox = self.tr.boundingBox(self.text, buffer);
         const bbx = @as(f64, @floatFromInt(bbox[0]));
         const bby = @as(f64, @floatFromInt(bbox[1]));
 
@@ -56,8 +58,8 @@ pub const Label = struct {
                 y < bby + @as(f64, @floatFromInt(self.text.bg_h)));
     }
 
-    pub fn render(self: *Label, monitor: *Monitor) void {
-        self.tr.renderText(self.text, self.alignment, monitor, self.context);
+    pub fn render(self: *Label, buffer: *Buffer) void {
+        self.tr.renderText(self.text, self.alignment, buffer, self.context);
     }
 
     pub fn deinit(self: *Label) void {

@@ -5,7 +5,7 @@ const Context = ctx.Context;
 const ft = ctx.ft;
 const hb = ctx.hb;
 
-const Monitor = @import("./window.zig").Monitor;
+const Buffer = @import("./window.zig").Buffer;
 
 pub const Text = struct {
     glyph_count: u32,
@@ -85,16 +85,16 @@ pub const TextRenderer = struct {
         };
     }
 
-    pub fn boundingBox(_: *TextRenderer, text: Text, monitor: *Monitor) [2]i64 {
-        const bg_x: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.width)) - @as(i64, @intCast(text.bg_w)), 2);
-        const bg_y: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.height)) - @as(i64, @intCast(text.bg_h)), 2);
+    pub fn boundingBox(_: *TextRenderer, text: Text, buffer: *Buffer) [2]i64 {
+        const bg_x: i64 = @divTrunc(@as(i64, @intCast(buffer.width)) - @as(i64, @intCast(text.bg_w)), 2);
+        const bg_y: i64 = @divTrunc(@as(i64, @intCast(buffer.height)) - @as(i64, @intCast(text.bg_h)), 2);
 
         return .{bg_x, bg_y} ;
     }
 
-    pub fn renderText(self: *TextRenderer, text: Text, alignment: u32, monitor: *Monitor, context: *Context) void {
-        const bg_x: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.width)) - @as(i64, @intCast(text.bg_w)), 2);
-        const bg_y: i64 = @divTrunc(@as(i64, @intCast(monitor.buffer.height)) - @as(i64, @intCast(text.bg_h)), 2);
+    pub fn renderText(self: *TextRenderer, text: Text, alignment: u32, buffer: *Buffer, context: *Context) void {
+        const bg_x: i64 = @divTrunc(@as(i64, @intCast(buffer.width)) - @as(i64, @intCast(text.bg_w)), 2);
+        const bg_y: i64 = @divTrunc(@as(i64, @intCast(buffer.height)) - @as(i64, @intCast(text.bg_h)), 2);
 
         // Draw background
         var y: u32 = 0;
@@ -105,10 +105,10 @@ pub const TextRenderer = struct {
                 const py = bg_y + @as(i64, @intCast(y));
 
                 if (px >= 0 and py >= 0 and 
-                    px < @as(i64, @intCast(monitor.buffer.width)) and 
-                    py < @as(i64, @intCast(monitor.buffer.height))) {
-                    const idx = @as(usize, @intCast(py)) * monitor.buffer.width + @as(usize, @intCast(px));
-                    monitor.buffer.pixels[idx] = text.bg;
+                    px < @as(i64, @intCast(buffer.width)) and 
+                    py < @as(i64, @intCast(buffer.height))) {
+                    const idx = @as(usize, @intCast(py)) * buffer.width + @as(usize, @intCast(px));
+                    buffer.pixels[idx] = text.bg;
                 }
             }
         }
@@ -145,7 +145,7 @@ pub const TextRenderer = struct {
             const draw_x = pen_x + @as(i64, @intCast(glyph_left)) + @divTrunc(text.pos[i].x_offset, 64);
             const draw_y = pen_y - @as(i64, @intCast(glyph_top)) + @divTrunc(text.pos[i].y_offset, 64);
 
-            self.drawBitmap(bitmap, draw_x, draw_y, text.fg, monitor.buffer.pixels, monitor.buffer.width, monitor.buffer.height);
+            self.drawBitmap(bitmap, draw_x, draw_y, text.fg, buffer.pixels, buffer.width, buffer.height);
 
             pen_x += @divTrunc(text.pos[i].x_advance, 64);
             pen_y += @divTrunc(text.pos[i].y_advance, 64);

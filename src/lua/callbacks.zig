@@ -3,12 +3,14 @@ const zlua = @import("zlua");
 const Lua = zlua.Lua;
 const Context = @import("../context.zig").Context;
 const getContext = @import("./api_als.zig").getContext;
-const widgets = @import("../widgets.zig");
+const luaWidget = @import("./api_widget.zig").luaWidget;
+const luaWindow = @import("./api_window.zig").luaWindow;
 const window = @import("../window.zig");
+const widgets = @import("../widgets.zig");
 const callbacks = @import("../callbacks.zig");
 
 pub fn luaSetWidgetCallback(L: *Lua) i32 {
-    const widget_ptr_ptr = L.checkUserdata(*widgets.Widget, 1, "Widget");
+    const widget_ptr_ptr = L.checkUserdata(*luaWidget, 1, "Widget");
     const widget_ptr = widget_ptr_ptr.*;
 
     const callback_type_str = L.toString(2) catch {
@@ -33,14 +35,16 @@ pub fn luaSetWidgetCallback(L: *Lua) i32 {
         return 0;
     };
 
-    switch (widget_ptr.*) {
-        .label => {
-            widget_ptr.label.callbacks.set(callback_type, ref) catch {
-                L.unref(zlua.registry_index, ref);
-                L.raiseErrorStr("Failed to set callback", .{});
-                return 0;
-            };
-        },
+    for (widget_ptr.widgets.items) |widget| {
+        switch (widget.*) {
+            .label => {
+                widget.label.callbacks.set(callback_type, ref) catch {
+                    L.unref(zlua.registry_index, ref);
+                    L.raiseErrorStr("Failed to set callback", .{});
+                    return 0;
+                };
+            },
+        }
     }
 
     return 0;
@@ -85,7 +89,7 @@ pub fn handleWindowCallback(
     callback: i32,
     context: *Context,
     extra_args: anytype,
-    ) void {
+) void {
     _ = context.lua.rawGetIndex(zlua.registry_index, callback);
 
     const userdata_ptr = context.lua.newUserdata(*window.Window, 0);
@@ -108,7 +112,7 @@ pub fn handleWindowCallback(
         total_args += 1;
     }
 
-    const args = zlua.Lua.ProtectedCallArgs {
+    const args = zlua.Lua.ProtectedCallArgs{
         .args = total_args,
         .results = 0,
         .msg_handler = 0,
@@ -124,17 +128,40 @@ pub fn handleWindowCallback(
     };
 }
 
-
 pub fn handleWidgetCallback(
     widget: *widgets.Widget,
     callback: i32,
     context: *Context,
     extra_args: anytype,
-    ) void {
+) void {
     _ = context.lua.rawGetIndex(zlua.registry_index, callback);
 
-    const userdata_ptr = context.lua.newUserdata(*widgets.Widget, 0);
-    userdata_ptr.* = widget;
+    var list = std.ArrayList(*widgets.Widget).initCapacity(context.allocator, 1) catch {
+        const args = zlua.Lua.ProtectedCallArgs{
+            .args = 0,
+            .results = 0,
+            .msg_handler = 0,
+        };
+        context.lua.protectedCall(args) catch {};
+        return;
+    };
+    list.append(context.allocator, widget) catch {
+        list.deinit(context.allocator);
+        const args = zlua.Lua.ProtectedCallArgs{ .args = 0, .results = 0, .msg_handler = 0 };
+        context.lua.protectedCall(args) catch {};
+        return;
+    };
+
+    const lw = context.allocator.create(luaWidget) catch {
+        list.deinit(context.allocator);
+        const args = zlua.Lua.ProtectedCallArgs{ .args = 0, .results = 0, .msg_handler = 0 };
+        context.lua.protectedCall(args) catch {};
+        return;
+    };
+    lw.* = .{ .widgets = list };
+
+    const userdata_ptr = context.lua.newUserdata(*luaWidget, 0);
+    userdata_ptr.* = lw;
 
     _ = context.lua.getMetatableRegistry("Widget");
     context.lua.setMetatable(-2);
@@ -153,7 +180,7 @@ pub fn handleWidgetCallback(
         total_args += 1;
     }
 
-    const args = zlua.Lua.ProtectedCallArgs {
+    const args = zlua.Lua.ProtectedCallArgs{
         .args = total_args,
         .results = 0,
         .msg_handler = 0,

@@ -20,46 +20,38 @@ const handleWidgetCallback = @import("./lua/callbacks.zig").handleWidgetCallback
 pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) void {
     switch (event) {
         .enter => |enter| {
-            for (context.windows.items) |w| {
-                for (w.monitors.items) |*m| {
-                    if (m.surface == enter.surface) {
+            for (context.monitors.items) |m| {
+                for (m.windows.items) |w| {
+                    if (w.surface == enter.surface) {
                         context.active_window = w;
                         context.active_monitor = m;
-
-                        if (w.callbacks.get(.mouseenter)) |callback| {
-                            handleWindowCallback(w, callback, context, .{});
-                        }
                         break;
                     }
                 }
             }
         },
         .leave => |leave| {
-            for (context.windows.items) |w| {
-                for (w.monitors.items) |*m| {
-                    if (m.surface == leave.surface) {
-                        if (context.active_monitor) |active| {
-                            if (active.surface == leave.surface) {
-                                context.active_window = null;
-                                context.active_monitor = null;
-                            }
-                        }
-                        if (w.callbacks.get(.mouseleave)) |callback| {
-                            handleWindowCallback(w, callback, context, .{});
-                        }
-                        break;
+            for (context.monitors.items) |m| {
+                for (m.windows.items) |w| {
+                    if (w.surface == leave.surface) {
+                        context.active_window = null;
+                        context.active_monitor = null;
+                    }
+
+                    if (w.callbacks.get(.mouseleave)) |callback| {
+                        handleWindowCallback(w, callback, context, .{});
                     }
                 }
             }
         },
         .motion => |motion| {
             if (context.active_window) |active_window| {
-                if (context.active_monitor) |active_monitor| {
-                    if (active_window.hit(motion.surface_x.toDouble(), motion.surface_y.toDouble(), active_monitor)) |widget| {
+                if (context.active_monitor) |_| {
+                    if (active_window.hit(motion.surface_x.toDouble(), motion.surface_y.toDouble())) |widget| {
                         switch (widget.*) {
                             .label => |*l| {
                                 if (l.callbacks.get(.mousemotion)) |callback| {
-                                    handleWidgetCallback(widget, callback, context, .{motion.surface_x.toInt(), motion.surface_y.toInt()});
+                                    handleWidgetCallback(widget, callback, context, .{ motion.surface_x.toInt(), motion.surface_y.toInt() });
                                 }
                             },
                         }

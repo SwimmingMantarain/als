@@ -4,6 +4,8 @@ const Lua = zlua.Lua;
 const window = @import("../window.zig");
 const widgets = @import("../widgets.zig");
 const getContext = @import("./bindings.zig").getContext;
+const Context = @import("../context.zig").Context;
+const luaWidget = @import("./api_widget.zig").luaWidget;
 const luaSetWindowCallback = @import("./callbacks.zig").luaSetWindowCallback;
 
 pub fn createWindowMetatable(L: *Lua) void {
@@ -25,20 +27,44 @@ pub fn createWindowMetatable(L: *Lua) void {
     L.pop(1);
 }
 
+pub const luaWindow = struct {
+    context: *Context,
+    windows: std.ArrayList(*window.Window),
+
+    pub fn toEdge(self: *luaWindow, edge: i32) void {
+        for (self.windows.items) |w| {
+            w.toEdge(edge);
+        }
+    }
+
+    pub fn newLabel(self: *luaWindow, text: []const u8, font_size: u32, padding: u32, alignment: u32) anyerror!luaWidget {
+        var labels = try std.ArrayList(*widgets.Widget).initCapacity(self.context.allocator, self.windows.items.len);
+
+        for (self.windows.items) |w| {
+            const label = try w.newLabel(text, font_size, padding, alignment);
+            try labels.append(self.context.allocator, label);
+        }
+
+        return luaWidget{
+            .widgets = labels,
+        };
+    }
+};
+
 fn luaSetWindowEdge(L: *Lua) i32 {
-    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
-    const window_ptr = window_ptr_ptr.*;
+    const lwin_ptr_ptr = L.checkUserdata(*luaWindow, 1, "Window");
+    const lwin_ptr = lwin_ptr_ptr.*;
 
     const edge = L.toInteger(2) catch 0; // 0 -> center
 
-    window_ptr.toEdge(@intCast(edge));
+    lwin_ptr.toEdge(@intCast(edge));
 
     return 0;
 }
 
 fn luaWindowNewLabel(L: *Lua) i32 {
-    const window_ptr_ptr = L.checkUserdata(*window.Window, 1, "Window");
-    const window_ptr = window_ptr_ptr.*;
+    const lwin_ptr_ptr = L.checkUserdata(*luaWindow, 1, "Window");
+    const lwin_ptr = lwin_ptr_ptr.*;
 
     const context = getContext(L) catch {
         _ = L.pushString("Failed to get context");
@@ -51,33 +77,24 @@ fn luaWindowNewLabel(L: *Lua) i32 {
     const padding = L.toInteger(4) catch 0;
     const alignment = L.toInteger(5) catch 0; // 0 -> center
 
-    const label = window_ptr.newLabel(
+    const lwid = lwin_ptr.newLabel(
         text,
         @intCast(font_size),
-        @intCast(padding), @intCast(alignment),
-        context,
+        @intCast(padding),
+        @intCast(alignment),
     ) catch {
         L.raiseErrorStr("Failed to create label", .{});
         return 0;
     };
 
-    const widget = widgets.Widget{
-        .label = label,
-    };
-
-    const w_ptr = context.allocator.create(widgets.Widget) catch {
-        L.raiseErrorStr("Failed to allocatoe memory for new Widget", .{});
+    const lwid_ptr = context.allocator.create(luaWidget) catch {
+        L.raiseErrorStr("Failed to allocate memory for luaLabel", .{});
         return 0;
     };
-    w_ptr.* = widget;
+    lwid_ptr.* = lwid;
 
-    window_ptr.widgets.append(context.allocator, w_ptr) catch {
-        L.raiseErrorStr("Failed to append label", .{});
-        return 0;
-    };
-
-    const userdata_ptr = L.newUserdata(*widgets.Widget, 0);
-    userdata_ptr.* = w_ptr;
+    const userdata_ptr = L.newUserdata(*luaWidget, 0);
+    userdata_ptr.* = lwid_ptr;
 
     _ = L.getMetatableRegistry("Widget");
     L.setMetatable(-2);

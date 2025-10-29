@@ -39,9 +39,27 @@ pub fn main() anyerror!void {
 
     registry.setListener(*Context, registryListener, &context);
 
-    if (display.roundtrip() != .SUCCESS) return error.RoundtripFailed; // Get Globals
-    if (display.roundtrip() != .SUCCESS) return error.RoundtripFailed; // Get Output Info
-    if (display.roundtrip() != .SUCCESS) return error.RoundtripFailed; // Give outputs some time to think
+    if (display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
+
+    while (true) {
+        if (context.outputs.items.len == 0) {
+            if (display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
+            continue;
+        }
+
+        var all_ready = true;
+        for (context.outputs.items) |output| {
+            if (!output.ready) {
+                all_ready = false;
+                break;
+            }
+        }
+        if (all_ready) break;
+
+        if (display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
+    }
+
+    context.init_monitors() catch return error.MonitorInitFailed;
 
     const config_path = "./config.lua"; // Testing purposes only
     lua.doFile(config_path) catch |err| {
@@ -58,8 +76,8 @@ pub fn main() anyerror!void {
     while (true) {
         if (display.dispatch() != .SUCCESS) return error.DispatchFailed;
 
-        for (context.windows.items) |w| {
-            try w.update(display);
+        for (context.monitors.items) |m| {
+            try m.update(display);
         }
 
         std.Thread.sleep(16_000_000); // ~60fps (16ms)
@@ -76,9 +94,10 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
             } else if (mem.orderZ(u8, global.interface, zwlr.LayerShellV1.interface.name) == .eq) {
                 context.layer_shell = registry.bind(global.name, zwlr.LayerShellV1, 1) catch return;
             } else if (mem.orderZ(u8, global.interface, wl.Output.interface.name) == .eq) {
-                const output = registry.bind(global.name, wl.Output, 1) catch return;
+                const out_ver: u32 = @min(global.version, 4);
+                const output = registry.bind(global.name, wl.Output, @intCast(out_ver)) catch return;
 
-                const info = OutputInfo{ .output = output };
+                const info = OutputInfo{ .output = output, .allocator = context.allocator };
                 context.outputs.append(context.allocator, info) catch return;
 
                 const stored_info = &context.outputs.items[context.outputs.items.len - 1];
@@ -97,9 +116,15 @@ fn outputListener(_: *wl.Output, event: wl.Output.Event, info: *OutputInfo) void
         .mode => |mode| {
             info.width = mode.width;
             info.height = mode.height;
+            if (mode.width > 0 and mode.height > 0) info.ready = true; // mark ready on first mode
         },
         .done => {
             info.ready = true;
+        },
+        .name => |name| {
+            if (info.name.len != 0) info.allocator.free(info.name);
+            const src = mem.span(name.name);
+            info.name = info.allocator.dupe(u8, src) catch return;
         },
         else => {},
     }

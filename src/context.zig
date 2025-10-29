@@ -34,7 +34,7 @@ pub const Context = struct {
     seat: ?*wl.Seat,
     pointer: ?*wl.Pointer,
     keyboard: ?*wl.Keyboard,
-    windows: std.ArrayList(*window.Window),
+    monitors: std.ArrayList(*window.Monitor),
     active_window: ?*window.Window,
     active_monitor: ?*window.Monitor,
     lua: *zlua.Lua,
@@ -75,7 +75,7 @@ pub const Context = struct {
             .seat = null,
             .pointer = null,
             .keyboard = null,
-            .windows = try .initCapacity(gpa, 5),
+            .monitors = try .initCapacity(gpa, 5),
             .active_window = null,
             .active_monitor = null,
             .lua = lua,
@@ -85,11 +85,26 @@ pub const Context = struct {
             .ft = ft_lib,
             .ft_face = ft_face,
         };
-        
+
         return context;
     }
 
+    pub fn init_monitors(self: *Context) anyerror!void {
+        for (self.outputs.items) |output| {
+            const monitor = try window.Monitor.new(output, self);
+            const mon_ptr = try self.allocator.create(window.Monitor);
+
+            mon_ptr.* = monitor;
+
+            try self.monitors.append(self.allocator, mon_ptr);
+        }
+    }
+
     pub fn deinit(self: *Context) void {
+        // Free any allocated output names
+        for (self.outputs.items) |*out| {
+            if (out.name.len != 0) out.allocator.free(out.name);
+        }
         if (self.xkb_state) |state| {
             xkb.xkb_state_unref(state);
         }
@@ -109,6 +124,6 @@ pub const Context = struct {
         }
 
         self.outputs.deinit(self.allocator);
-        self.windows.deinit(self.allocator);
+        self.monitors.deinit(self.allocator);
     }
 };
