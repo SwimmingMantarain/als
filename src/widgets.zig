@@ -32,6 +32,8 @@ pub const Label = struct {
     tr: TextRenderer,
     alignment: u32,
     callbacks: callbacks.CallbackHandler,
+    font_size: u32,
+    padding: u32,
     context: *Context,
 
     pub fn new(text: []const u8, font_size: u32, padding: u32, fg: u32, bg: u32, alignment: u32, context: *Context) anyerror!Widget{
@@ -41,6 +43,8 @@ pub const Label = struct {
             .tr = TextRenderer{},
             .alignment = alignment,
             .callbacks = callbacks.CallbackHandler.init(context.allocator, context.lua),
+            .font_size = font_size,
+            .padding = padding,
             .context = context,
         };
 
@@ -56,6 +60,12 @@ pub const Label = struct {
                 x < bbx + @as(f64, @floatFromInt(self.text.bg_w)) and
                 y > bby and
                 y < bby + @as(f64, @floatFromInt(self.text.bg_h)));
+    }
+
+    pub fn set_text(self: *Label, text: []const u8) void {
+        const label_text = TextRenderer.newText(text, self.font_size, self.padding, self.text.fg, self.text.bg, self.context) catch return;
+
+        self.text = label_text;
     }
 
     pub fn render(self: *Label, buffer: *Buffer) void {
