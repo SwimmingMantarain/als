@@ -41,22 +41,45 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
                     if (w.callbacks.get(.mouseleave)) |callback| {
                         handleWindowCallback(w, callback, context, .{});
                     }
+
+                    if (w.active_widget) |widget| {
+                        switch (widget.*) {
+                            .label => |*l| {
+                                if (l.callbacks.get(.mouseleave)) |callback| {
+                                    handleWidgetCallback(widget, callback, context, .{});
+                                }   
+                            },
+                        }
+
+                        w.active_widget = null;
+                    }
                 }
             }
         },
         .motion => |motion| {
             if (context.active_window) |active_window| {
                 if (context.active_monitor) |_| {
-                    if (active_window.hit(motion.surface_x.toDouble(), motion.surface_y.toDouble())) |widget| {
+                    const x = motion.surface_x.toDouble();
+                    const y = motion.surface_y.toDouble();
+
+                    if (active_window.mouseEnterWidget(x, y)) |widget| {
                         switch (widget.*) {
                             .label => |*l| {
-                                if (l.callbacks.get(.mousemotion)) |callback| {
+                                if (l.callbacks.get(.mouseenter)) |callback| {
                                     handleWidgetCallback(widget, callback, context, .{ motion.surface_x.toInt(), motion.surface_y.toInt() });
                                 }
                             },
                         }
-                    } else if (active_window.callbacks.get(.mousemotion)) |callback| {
-                        handleWindowCallback(active_window, callback, context, .{});
+                    }
+
+                    if (active_window.mouseLeaveWidget(x, y)) |widget| {
+                        switch (widget.*) {
+                            .label => |*l| {
+                                if (l.callbacks.get(.mouseleave)) |callback| {
+                                    handleWidgetCallback(widget, callback, context, .{ motion.surface_x.toInt(), motion.surface_y.toInt() });
+                                }
+                            },
+                        }
                     }
                 }
             }

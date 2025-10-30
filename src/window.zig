@@ -129,6 +129,7 @@ pub const Monitor = struct {
             .layer_surface = layer_surface,
             .buffer = mbuffer,
             .widgets = widgets,
+            .active_widget = null,
             .bg_color = bg_color,
             .callbacks = callbacks.CallbackHandler.init(self.context.allocator, self.context.lua),
             .context = self.context,
@@ -154,6 +155,7 @@ pub const Window = struct {
     layer_surface: *zwlr.LayerSurfaceV1,
     buffer: Buffer,
     widgets: std.ArrayList(*Widget),
+    active_widget: ?*Widget,
     bg_color: u32,
     callbacks: callbacks.CallbackHandler,
     context: *Context,
@@ -185,10 +187,25 @@ pub const Window = struct {
         self.surface.commit();
     }
 
-    pub fn hit(self: *Window, x: f64, y: f64) ?*Widget {
+    pub fn mouseEnterWidget(self: *Window, x: f64, y: f64) ?*Widget {
         for (self.widgets.items) |widget| {
-            if (widget.contains(x, y, &self.buffer)) return widget;
+            if (widget.contains(x, y, &self.buffer) and self.active_widget == null) {
+                self.active_widget = widget;
+                return widget;
+            } 
         }
+
+        return null;
+    }
+
+    pub fn mouseLeaveWidget(self: *Window, x: f64, y: f64) ?*Widget {
+        for (self.widgets.items) |widget| {
+            if (!widget.contains(x, y, &self.buffer) and self.active_widget == widget) {
+                self.active_widget = null;
+                return widget;
+            }
+        }
+
         return null;
     }
 
