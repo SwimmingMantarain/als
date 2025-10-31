@@ -42,7 +42,7 @@ pub const Label = struct {
             .text = label_text,
             .tr = TextRenderer{},
             .alignment = alignment,
-            .callbacks = callbacks.CallbackHandler.init(context.allocator, context.lua),
+            .callbacks = callbacks.CallbackHandler.init(context.gpa, context.lua),
             .font_size = font_size,
             .padding = padding,
             .context = context,
@@ -74,6 +74,6 @@ pub const Label = struct {
 
     pub fn deinit(self: *Label) void {
         self.callbacks.deinit();
-        self.text.deinit(self.context.allocator);
+        self.text.deinit(self.context.gpa);
     }
 };

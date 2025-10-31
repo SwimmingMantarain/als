@@ -28,21 +28,30 @@ pub fn createWindowMetatable(L: *Lua) void {
 }
 
 pub const luaWindow = struct {
+    id: u32,
     context: *Context,
-    windows: std.ArrayList(*window.Window),
 
     pub fn toEdge(self: *luaWindow, edge: i32) void {
-        for (self.windows.items) |w| {
+        var wins = self.context.monitors.get_windows(self.id, self.context) catch {
+            std.debug.print("Unknown window id: {}!\n", .{self.id});
+            return;
+        };
+
+        for (wins.items) |w| {
             w.toEdge(edge);
         }
+
+        // no losin' :)
+        wins.deinit(self.context.gpa);
     }
 
     pub fn newLabel(self: *luaWindow, text: []const u8, font_size: u32, padding: u32, alignment: u32) anyerror!luaWidget {
-        var labels = try std.ArrayList(*widgets.Widget).initCapacity(self.context.allocator, self.windows.items.len);
+        const wins = try self.context.monitors.get_windows(self.id, self.context);
+        var labels = try std.ArrayList(*widgets.Widget).initCapacity(self.context.gpa, wins.items.len);
 
-        for (self.windows.items) |w| {
+        for (wins.items) |w| {
             const label = try w.newLabel(text, font_size, padding, alignment);
-            try labels.append(self.context.allocator, label);
+            try labels.append(self.context.gpa, label);
         }
 
         return luaWidget{
@@ -87,10 +96,11 @@ fn luaWindowNewLabel(L: *Lua) i32 {
         return 0;
     };
 
-    const lwid_ptr = context.allocator.create(luaWidget) catch {
+    const lwid_ptr = context.gpa.create(luaWidget) catch {
         L.raiseErrorStr("Failed to allocate memory for luaLabel", .{});
         return 0;
     };
+
     lwid_ptr.* = lwid;
 
     const userdata_ptr = L.newUserdata(*luaWidget, 0);

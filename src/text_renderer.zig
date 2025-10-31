@@ -19,20 +19,20 @@ pub const Text = struct {
     bg: u32,
     fg: u32,
 
-    pub fn deinit(self: *Text, allocator: *std.mem.Allocator) void {
-        allocator.free(self.infos[0..self.glyph_count]);
-        allocator.free(self.pos[0..self.glyph_count]);
+    pub fn deinit(self: *Text, gpa: *std.mem.Allocator) void {
+        gpa.free(self.infos[0..self.glyph_count]);
+        gpa.free(self.pos[0..self.glyph_count]);
     }
 };
 
 pub const TextRenderer = struct {
     pub fn newText(text: []const u8, font_size: u32, padding: u32, fg: u32, bg: u32, context: *Context) anyerror!Text {
-        if (ft.FT_Set_Pixel_Sizes(context.ft_face, @intCast(font_size), @intCast(font_size)) != 0) {
+        if (ft.FT_Set_Pixel_Sizes(context.render.ft_face, @intCast(font_size), @intCast(font_size)) != 0) {
             std.debug.print("Failed to set character size\n", .{});
             return error.FailedToSetCharSize;
         }
 
-        const hb_font: *hb.hb_font_t = hb.hb_ft_font_create(context.ft_face, null) orelse {
+        const hb_font: *hb.hb_font_t = hb.hb_ft_font_create(context.render.ft_face, null) orelse {
             std.debug.print("Failed to create HarfBuzz font\n", .{});
             return error.FailedToCreateHBFont;
         };
@@ -57,7 +57,7 @@ pub const TextRenderer = struct {
             total_width += @divTrunc(glyph_pos[i].x_advance, 64);
         }
 
-        const face_size = context.ft_face.*.size.*.metrics;
+        const face_size = context.render.ft_face.*.size.*.metrics;
         const ascender: i64 = @divTrunc(face_size.ascender, 64);
         const descender: i64 = @divTrunc(face_size.descender, 64);
         const total_height: i64 = ascender - descender; // descender is negative
@@ -65,8 +65,8 @@ pub const TextRenderer = struct {
         const bg_width: u32 = @as(u32, @intCast(total_width)) + 2 * padding;
         const bg_height: u32 = @as(u32, @intCast(total_height)) + 2 * padding;
 
-        const infos = try context.allocator.alloc(hb.hb_glyph_info_t, glyph_count);
-        const positions = try context.allocator.alloc(hb.hb_glyph_position_t, glyph_count);
+        const infos = try context.gpa.alloc(hb.hb_glyph_info_t, glyph_count);
+        const positions = try context.gpa.alloc(hb.hb_glyph_position_t, glyph_count);
 
         @memcpy(infos, glyph_info[0..glyph_count]);
         @memcpy(positions, glyph_pos[0..glyph_count]);
@@ -123,7 +123,7 @@ pub const TextRenderer = struct {
             text_start_x += available_width - text.total_width;
         }
 
-        const face_size = context.ft_face.*.size.*.metrics;
+        const face_size = context.render.ft_face.*.size.*.metrics;
         const ascender: i64 = @divTrunc(face_size.ascender, 64);
 
         var pen_x: i64 = text_start_x;
@@ -133,14 +133,14 @@ pub const TextRenderer = struct {
         for (0..text.glyph_count) |i| {
             const glyph_index = text.infos[i].codepoint;
 
-            if (ft.FT_Load_Glyph(context.ft_face, glyph_index, ft.FT_LOAD_RENDER) != 0) {
+            if (ft.FT_Load_Glyph(context.render.ft_face, glyph_index, ft.FT_LOAD_RENDER) != 0) {
                 std.debug.print("Failed to load glyph {} (glyph_index: {})\n", .{i, glyph_index});
                 continue;
             }
 
-            const bitmap: *ft.FT_Bitmap = &context.ft_face.*.glyph.*.bitmap;
-            const glyph_left = context.ft_face.*.glyph.*.bitmap_left;
-            const glyph_top = context.ft_face.*.glyph.*.bitmap_top;
+            const bitmap: *ft.FT_Bitmap = &context.render.ft_face.*.glyph.*.bitmap;
+            const glyph_left = context.render.ft_face.*.glyph.*.bitmap_left;
+            const glyph_top = context.render.ft_face.*.glyph.*.bitmap_top;
 
             const draw_x = pen_x + @as(i64, @intCast(glyph_left)) + @divTrunc(text.pos[i].x_offset, 64);
             const draw_y = pen_y - @as(i64, @intCast(glyph_top)) + @divTrunc(text.pos[i].y_offset, 64);

@@ -20,22 +20,22 @@ const handleWidgetCallback = @import("./lua/callbacks.zig").handleWidgetCallback
 pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) void {
     switch (event) {
         .enter => |enter| {
-            for (context.monitors.items) |m| {
+            for (context.monitors.monitors.items) |m| {
                 for (m.windows.items) |w| {
                     if (w.surface == enter.surface) {
-                        context.active_window = w;
-                        context.active_monitor = m;
+                        context.monitors.active_window = w;
+                        context.monitors.active_monitor = m;
                         break;
                     }
                 }
             }
         },
         .leave => |leave| {
-            for (context.monitors.items) |m| {
+            for (context.monitors.monitors.items) |m| {
                 for (m.windows.items) |w| {
                     if (w.surface == leave.surface) {
-                        context.active_window = null;
-                        context.active_monitor = null;
+                        context.monitors.active_window = null;
+                        context.monitors.active_monitor = null;
                     }
 
                     if (w.callbacks.get(.mouseleave)) |callback| {
@@ -57,8 +57,8 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
             }
         },
         .motion => |motion| {
-            if (context.active_window) |active_window| {
-                if (context.active_monitor) |_| {
+            if (context.monitors.active_window) |active_window| {
+                if (context.monitors.active_monitor) |_| {
                     const x = motion.surface_x.toDouble();
                     const y = motion.surface_y.toDouble();
 
@@ -85,7 +85,7 @@ pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Contex
             }
         },
         .button => |button| {
-            if (context.active_window) |active_window| {
+            if (context.monitors.active_window) |active_window| {
                 const btn = button.button;
                 const state = button.state;
 

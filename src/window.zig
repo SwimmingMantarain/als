@@ -18,30 +18,36 @@ const callbacks = @import("./callbacks.zig");
 
 pub const OutputInfo = struct {
     output: *wl.Output,
+    context: *Context,
     width: i32 = 0,
     height: i32 = 0,
     name: []u8 = &[_]u8{},
-    allocator: std.mem.Allocator,
     ready: bool = false,
 };
 
 pub const Monitor = struct {
     output: OutputInfo,
     context: *Context,
+    id: u32,
     windows: std.ArrayList(*Window),
 
-    pub fn new(output: OutputInfo, context: *Context) anyerror!Monitor {
+    pub fn new(output: OutputInfo, id: u32, context: *Context) anyerror!Monitor {
         const monitor = Monitor{
             .output = output,
             .context = context,
-            .windows = try std.ArrayList(*Window).initCapacity(context.allocator, 5),
+            .id = id,
+            .windows = try std.ArrayList(*Window).initCapacity(context.gpa, 5),
         };
 
         return monitor;
     }
 
     pub fn deinit(self: *Monitor) void {
-        self.windows.deinit(self.context.allocator);
+        for (self.windows.items) |window| {
+            window.deinit(self.context.gpa);
+            self.context.gpa.destroy(window);
+        }
+        self.windows.deinit(self.context.gpa);
     }
 
     pub fn update(self: *Monitor, display: *wl.Display) anyerror!void {
@@ -51,8 +57,8 @@ pub const Monitor = struct {
         }
     }
 
-    pub fn new_window(self: *Monitor, window_name: []const u8, bg_color: u32, w: i64, h: i64) ?*Window {
-        const widgets = std.ArrayList(*Widget).initCapacity(self.context.allocator, 10) catch return null;
+    pub fn new_window(self: *Monitor, w: i64, h: i64, id: u32) anyerror!*Window {
+        const widgets = try std.ArrayList(*Widget).initCapacity(self.context.gpa, 10);
 
         // Check if we want to be as wide or tall as the screen
         const width: u64 = if (w < 0) @as(u64, @intCast(self.output.width)) else @as(u64, @intCast(w));
@@ -62,26 +68,26 @@ pub const Monitor = struct {
             const stride = width * 4;
             const size = stride * height;
 
-            const fd = posix.memfd_create(window_name, 0) catch return null;
-            posix.ftruncate(fd, size) catch return null;
+            const fd = try posix.memfd_create("als-window", 0);
+            try posix.ftruncate(fd, size);
 
-            const data = posix.mmap(
+            const data = try posix.mmap(
                 null,
                 size,
                 posix.PROT.READ | posix.PROT.WRITE,
                 .{ .TYPE = .SHARED },
                 fd,
                 0,
-            ) catch return null;
+            );
 
             const pixels: [*]u32 = @ptrCast(@alignCast(data.ptr));
             const pixel_count = size / 4;
-            @memset(pixels[0..pixel_count], bg_color); // ARGB
+            @memset(pixels[0..pixel_count], 0xFF000000); // ARGB Black
 
-            const pool = self.context.shm.?.createPool(fd, @as(i32, @intCast(size))) catch return null;
+            const pool = try self.context.wayland.shm.?.createPool(fd, @as(i32, @intCast(size)));
             defer pool.destroy();
 
-            const buffer = pool.createBuffer(0, @as(i32, @intCast(width)), @as(i32, @intCast(height)), @as(i32, @intCast(stride)), wl.Shm.Format.argb8888) catch return null;
+            const buffer = try pool.createBuffer(0, @as(i32, @intCast(width)), @as(i32, @intCast(height)), @as(i32, @intCast(stride)), wl.Shm.Format.argb8888);
 
             break :blk Buffer{
                 .buffer = buffer,
@@ -92,14 +98,14 @@ pub const Monitor = struct {
             };
         };
 
-        const surface = self.context.compositor.?.createSurface() catch return null;
+        const surface = try self.context.wayland.compositor.?.createSurface();
 
-        const region = self.context.compositor.?.createRegion() catch return null;
+        const region = try self.context.wayland.compositor.?.createRegion();
         region.add(0, 0, @intCast(width), @intCast(height));
         surface.setInputRegion(region);
         region.destroy();
 
-        const layer_surface = self.context.layer_shell.?.getLayerSurface(surface, self.output.output, zwlr.LayerShellV1.Layer.overlay, "cat") catch return null;
+        const layer_surface = try self.context.wayland.layer_shell.?.getLayerSurface(surface, self.output.output, zwlr.LayerShellV1.Layer.overlay, "cat");
 
         layer_surface.setSize(@intCast(width), @intCast(height));
         layer_surface.setExclusiveZone(@intCast(height));
@@ -117,28 +123,37 @@ pub const Monitor = struct {
         surface.commit();
 
         while (!configured) {
-            if (self.context.display.dispatch() != .SUCCESS) return null;
+            if (self.context.wayland.display.dispatch() != .SUCCESS) return error.DisplayDispatchFailed;
         }
 
         surface.attach(mbuffer.buffer, 0, 0);
         surface.commit();
 
-        const win_ptr = self.context.allocator.create(Window) catch return null;
+        const win_ptr = try self.context.gpa.create(Window);
         win_ptr.* = Window{
             .surface = surface,
             .layer_surface = layer_surface,
             .buffer = mbuffer,
+            .bg_color = 0xFF000000,
             .widgets = widgets,
             .active_widget = null,
-            .bg_color = bg_color,
-            .callbacks = callbacks.CallbackHandler.init(self.context.allocator, self.context.lua),
+            .callbacks = callbacks.CallbackHandler.init(self.context.gpa, self.context.lua),
             .context = self.context,
+            .id = id,
             .dirty = true,
         };
 
-        self.windows.append(self.context.allocator, win_ptr) catch return null;
+        try self.windows.append(self.context.gpa, win_ptr);
 
         return win_ptr;
+    }
+
+    pub fn get_window(self: *Monitor, id: u32) ?*Window {
+        for (self.windows.items) |w| {
+            if (w.id == id) return w;
+        }
+
+        return null;
     }
 };
 
@@ -159,18 +174,19 @@ pub const Window = struct {
     bg_color: u32,
     callbacks: callbacks.CallbackHandler,
     context: *Context,
+    id: u32,
     dirty: bool,
 
-    pub fn deinit(self: *Window, allocator: *Allocator) void {
+    pub fn deinit(self: *Window, gpa: Allocator) void {
         self.callbacks.deinit();
 
         const size = self.buffer.width * self.buffer.height * 4;
-        posix.munmap(@as([*]align(mem.page_size) u8, @ptrCast(self.buffer.pixels))[0..size]);
+        posix.munmap(@as([*]align(std.heap.page_size_min) u8, @ptrCast(@alignCast(self.buffer.pixels)))[0..size]);
         self.layer_surface.destroy();
         self.surface.destroy();
         self.buffer.buffer.destroy();
 
-        self.widgets.deinit(allocator);
+        self.widgets.deinit(gpa);
     }
 
     pub fn update(self: *Window) anyerror!void {
@@ -220,10 +236,10 @@ pub const Window = struct {
             self.context,
         ) catch |err| return err;
 
-        const label_ptr = try self.context.allocator.create(Widget);
+        const label_ptr = try self.context.gpa.create(Widget);
         label_ptr.* = label;
 
-        try self.widgets.append(self.context.allocator, label_ptr);
+        try self.widgets.append(self.context.gpa, label_ptr);
 
         return label_ptr;
     }

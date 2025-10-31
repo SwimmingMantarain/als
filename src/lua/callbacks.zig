@@ -10,8 +10,7 @@ const widgets = @import("../widgets.zig");
 const callbacks = @import("../callbacks.zig");
 
 pub fn luaSetWidgetCallback(L: *Lua) i32 {
-    const widget_ptr_ptr = L.checkUserdata(*luaWidget, 1, "Widget");
-    const widget_ptr = widget_ptr_ptr.*;
+    const widget_ptr = L.checkUserdata(*luaWidget, 1, "Widget").*;
 
     const callback_type_str = L.toString(2) catch {
         L.raiseErrorStr("Expected string as 2nd arg", .{});
@@ -136,7 +135,7 @@ pub fn handleWidgetCallback(
 ) void {
     _ = context.lua.rawGetIndex(zlua.registry_index, callback);
 
-    var list = std.ArrayList(*widgets.Widget).initCapacity(context.allocator, 1) catch {
+    var list = std.ArrayList(*widgets.Widget).initCapacity(context.gpa, 1) catch {
         const args = zlua.Lua.ProtectedCallArgs{
             .args = 0,
             .results = 0,
@@ -145,15 +144,15 @@ pub fn handleWidgetCallback(
         context.lua.protectedCall(args) catch {};
         return;
     };
-    list.append(context.allocator, widget) catch {
-        list.deinit(context.allocator);
+    list.append(context.gpa, widget) catch {
+        list.deinit(context.gpa);
         const args = zlua.Lua.ProtectedCallArgs{ .args = 0, .results = 0, .msg_handler = 0 };
         context.lua.protectedCall(args) catch {};
         return;
     };
 
-    const lw = context.allocator.create(luaWidget) catch {
-        list.deinit(context.allocator);
+    const lw = context.gpa.create(luaWidget) catch {
+        list.deinit(context.gpa);
         const args = zlua.Lua.ProtectedCallArgs{ .args = 0, .results = 0, .msg_handler = 0 };
         context.lua.protectedCall(args) catch {};
         return;
