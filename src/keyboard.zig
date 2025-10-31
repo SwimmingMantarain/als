@@ -17,7 +17,7 @@ const Lua = zlua.Lua;
 
 const xkb = @import("./context.zig").xkb;
 
-const handleCallback = @import("./lua-funcs.zig").handleCallback;
+const handleWindowCallback = @import("./lua/callbacks.zig").handleWindowCallback;
 
 pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Context) void {
     switch (event) {
@@ -34,7 +34,7 @@ pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Con
             const keymap_str: [*:0]const u8 = @ptrCast(data.ptr);
 
             const xkb_keymap = xkb.xkb_keymap_new_from_string(
-                context.xkb_context,
+                context.input.xkb_context,
                 keymap_str,
                 xkb.XKB_KEYMAP_FORMAT_TEXT_V1,
                 xkb.XKB_KEYMAP_COMPILE_NO_FLAGS,
@@ -42,16 +42,16 @@ pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Con
 
             const xkb_state = xkb.xkb_state_new(xkb_keymap);
 
-            context.xkb_keymap = xkb_keymap;
-            context.xkb_state = xkb_state;
+            context.input.xkb_keymap = xkb_keymap;
+            context.input.xkb_state = xkb_state;
         },
         .key => |key| {
-            if (context.active_window) |active_window| {
-                if (active_window.callbacks.key) |callback| {
-                    const keysym = xkb.xkb_state_key_get_one_sym(context.xkb_state, key.key + 8); // +8 for linux evdev
+            if (context.monitors.active_window) |active_window| {
+                if (active_window.callbacks.get(.key)) |callback| {
+                    const keysym = xkb.xkb_state_key_get_one_sym(context.input.xkb_state, key.key + 8); // +8 for linux evdev
                     const keyutf32 = xkb.xkb_keysym_to_utf32(keysym);
 
-                    handleCallback(active_window, callback, context, .{ keyutf32 });
+                    handleWindowCallback(active_window, callback, context, .{ keyutf32 });
                 }
             }
         },
