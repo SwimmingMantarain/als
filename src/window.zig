@@ -88,7 +88,7 @@ pub const Monitor = struct {
             const pool = try self.context.wayland.shm.?.createPool(fd, @as(i32, @intCast(size)));
             defer pool.destroy();
 
-            const buffer = try pool.createBuffer(0, @as(i32, @intCast(width)) * self.output.scale, @as(i32, @intCast(height)) * self.output.scale, @as(i32, @intCast(stride)), wl.Shm.Format.argb8888);
+            const buffer = try pool.createBuffer(0, @as(i32, @intCast(width)), @as(i32, @intCast(height)), @as(i32, @intCast(stride)), wl.Shm.Format.argb8888);
 
             break :blk Buffer{
                 .buffer = buffer,
@@ -109,8 +109,10 @@ pub const Monitor = struct {
         region.destroy();
 
         const layer_surface = try self.context.wayland.layer_shell.?.getLayerSurface(surface, self.output.output, zwlr.LayerShellV1.Layer.overlay, "cat");
+        const logical_width = @divTrunc(self.output.width, self.output.scale);
+        const logical_height = @divTrunc(self.output.height, self.output.scale);
 
-        layer_surface.setSize(@intCast(width), @intCast(height));
+        layer_surface.setSize(@intCast(logical_width), @intCast(logical_height));
         layer_surface.setExclusiveZone(@intCast(height));
         layer_surface.setAnchor(.{
             .bottom = true,
