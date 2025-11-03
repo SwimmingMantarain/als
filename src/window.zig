@@ -21,6 +21,7 @@ pub const OutputInfo = struct {
     context: *Context,
     width: i32 = 0,
     height: i32 = 0,
+    scale: i32 = 1,
     name: []u8 = &[_]u8{},
     ready: bool = false,
 };
@@ -87,7 +88,7 @@ pub const Monitor = struct {
             const pool = try self.context.wayland.shm.?.createPool(fd, @as(i32, @intCast(size)));
             defer pool.destroy();
 
-            const buffer = try pool.createBuffer(0, @as(i32, @intCast(width)), @as(i32, @intCast(height)), @as(i32, @intCast(stride)), wl.Shm.Format.argb8888);
+            const buffer = try pool.createBuffer(0, @as(i32, @intCast(width)) * self.output.scale, @as(i32, @intCast(height)) * self.output.scale, @as(i32, @intCast(stride)), wl.Shm.Format.argb8888);
 
             break :blk Buffer{
                 .buffer = buffer,
@@ -99,6 +100,8 @@ pub const Monitor = struct {
         };
 
         const surface = try self.context.wayland.compositor.?.createSurface();
+
+        surface.setBufferScale(self.output.scale);
 
         const region = try self.context.wayland.compositor.?.createRegion();
         region.add(0, 0, @intCast(width), @intCast(height));
@@ -189,6 +192,12 @@ pub const Window = struct {
         self.widgets.deinit(gpa);
     }
 
+    pub fn set_pixel(self: *Window, x: u32, y: u32) void {
+        self.buffer.pixels[@as(usize, @intCast(y)) * self.buffer.width + @as(usize, @intCast(x))] = 0xFFFFFFFF; // ARGB White
+        self.surface.attach(self.buffer.buffer, 0, 0);
+        self.surface.commit();
+    }
+
     pub fn update(self: *Window) anyerror!void {
         if (self.dirty) {
             self.dirty = false;
@@ -225,14 +234,13 @@ pub const Window = struct {
         return null;
     }
 
-    pub fn newLabel(self: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32) anyerror!*Widget {
+    pub fn newLabel(self: *Window, text: []const u8, font_size: u32) anyerror!*Widget {
         const label = Label.new(
             text,
             font_size,
-            padding,
             0xFFFFFFFF, // foreground
             0xFF119911, // background
-            alignment,
+            0, // Default CENTER
             self.context,
         ) catch |err| return err;
 

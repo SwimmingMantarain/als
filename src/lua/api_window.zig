@@ -22,6 +22,9 @@ pub fn createWindowMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaWindowNewLabel));
     L.setField(-2, "new_label");
 
+    L.pushFunction(zlua.wrap(luaWindowSetPixel));
+    L.setField(-2, "set_pixel"); // debug purposes only
+
     L.setField(-2, "__index");
 
     L.pop(1);
@@ -45,12 +48,12 @@ pub const luaWindow = struct {
         wins.deinit(self.context.gpa);
     }
 
-    pub fn newLabel(self: *luaWindow, text: []const u8, font_size: u32, padding: u32, alignment: u32) anyerror!luaWidget {
+    pub fn newLabel(self: *luaWindow, text: []const u8, font_size: u32) anyerror!luaWidget {
         const wins = try self.context.monitors.get_windows(self.id, self.context);
         var labels = try std.ArrayList(*widgets.Widget).initCapacity(self.context.gpa, wins.items.len);
 
         for (wins.items) |w| {
-            const label = try w.newLabel(text, font_size, padding, alignment);
+            const label = try w.newLabel(text, font_size);
             try labels.append(self.context.gpa, label);
         }
 
@@ -58,7 +61,26 @@ pub const luaWindow = struct {
             .widgets = labels,
         };
     }
+
+    pub fn set_pixel(self: *luaWindow, x: u32, y: u32) void {
+        const wins = self.context.monitors.get_windows(self.id, self.context) catch return;
+
+        for (wins.items) |w| {
+            w.set_pixel(x, y);
+        }
+    }
 };
+
+fn luaWindowSetPixel(L: *Lua) i32 {
+    const lwin_ptr = L.checkUserdata(*luaWindow, 1, "Window").*;
+
+    const x = L.toInteger(2) catch 0;
+    const y = L.toInteger(3) catch 0;
+
+    lwin_ptr.set_pixel(@intCast(x), @intCast(y));
+
+    return 0;
+}
 
 fn luaSetWindowEdge(L: *Lua) i32 {
     const lwin_ptr_ptr = L.checkUserdata(*luaWindow, 1, "Window");
@@ -83,14 +105,10 @@ fn luaWindowNewLabel(L: *Lua) i32 {
 
     const text = L.toString(2) catch "label";
     const font_size = L.toInteger(3) catch 16;
-    const padding = L.toInteger(4) catch 0;
-    const alignment = L.toInteger(5) catch 0; // 0 -> center
 
     const lwid = lwin_ptr.newLabel(
         text,
         @intCast(font_size),
-        @intCast(padding),
-        @intCast(alignment),
     ) catch {
         L.raiseErrorStr("Failed to create label", .{});
         return 0;

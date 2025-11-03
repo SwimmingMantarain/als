@@ -88,7 +88,7 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, context: *
     switch (event) {
         .global => |global| {
             if (mem.orderZ(u8, global.interface, wl.Compositor.interface.name) == .eq) {
-                context.wayland.compositor = registry.bind(global.name, wl.Compositor, 1) catch return;
+                context.wayland.compositor = registry.bind(global.name, wl.Compositor, 6) catch return;
             } else if (mem.orderZ(u8, global.interface, wl.Shm.interface.name) == .eq) {
                 context.wayland.shm = registry.bind(global.name, wl.Shm, 1) catch return;
             } else if (mem.orderZ(u8, global.interface, zwlr.LayerShellV1.interface.name) == .eq) {
@@ -125,6 +125,9 @@ fn outputListener(_: *wl.Output, event: wl.Output.Event, info: *OutputInfo) void
             if (info.name.len != 0) info.context.gpa.free(info.name);
             const src = mem.span(name.name);
             info.name = info.context.gpa.dupe(u8, src) catch return;
+        },
+        .scale => |scale| {
+            info.scale = scale.factor;
         },
         else => {},
     }

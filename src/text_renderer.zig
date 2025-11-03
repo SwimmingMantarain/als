@@ -11,13 +11,14 @@ pub const Text = struct {
     glyph_count: u32,
     total_width: i64,
     total_height: i64,
-    padding: u32,
     infos: [*]hb.hb_glyph_info_t,
     pos: [*]hb.hb_glyph_position_t,
     bg_w: u32,
     bg_h: u32,
     bg: u32,
     fg: u32,
+    baseline_offset: i64,
+    left_offset: i64,
 
     pub fn deinit(self: *Text, gpa: *std.mem.Allocator) void {
         gpa.free(self.infos[0..self.glyph_count]);
@@ -26,7 +27,7 @@ pub const Text = struct {
 };
 
 pub const TextRenderer = struct {
-    pub fn newText(text: []const u8, font_size: u32, padding: u32, fg: u32, bg: u32, context: *Context) anyerror!Text {
+    pub fn newText(text: []const u8, font_size: u32, fg: u32, bg: u32, context: *Context) anyerror!Text {
         if (ft.FT_Set_Pixel_Sizes(context.render.ft_face, @intCast(font_size), @intCast(font_size)) != 0) {
             std.debug.print("Failed to set character size\n", .{});
             return error.FailedToSetCharSize;
@@ -57,13 +58,40 @@ pub const TextRenderer = struct {
             total_width += @divTrunc(glyph_pos[i].x_advance, 64);
         }
 
-        const face_size = context.render.ft_face.*.size.*.metrics;
-        const ascender: i64 = @divTrunc(face_size.ascender, 64);
-        const descender: i64 = @divTrunc(face_size.descender, 64);
-        const total_height: i64 = ascender - descender; // descender is negative
+        var actual_min_x: i64 = std.math.maxInt(i64);
+        var actual_max_x: i64 = std.math.minInt(i64);
+        var actual_min_y: i64 = std.math.maxInt(i64);
+        var actual_max_y: i64 = std.math.minInt(i64);
 
-        const bg_width: u32 = @as(u32, @intCast(total_width)) + 2 * padding;
-        const bg_height: u32 = @as(u32, @intCast(total_height)) + 2 * padding;
+        var pen_x: i64 = 0;
+        for (0..glyph_count) |i| {
+            if (ft.FT_Load_Glyph(context.render.ft_face, glyph_info[i].codepoint, ft.FT_LOAD_RENDER) == 0) {
+                const glyph_left = @as(i64, @intCast(context.render.ft_face.*.glyph.*.bitmap_left));
+                const glyph_top = @as(i64, @intCast(context.render.ft_face.*.glyph.*.bitmap_top));
+                const width = @as(i64, @intCast(context.render.ft_face.*.glyph.*.bitmap.width));
+                const height = @as(i64, @intCast(context.render.ft_face.*.glyph.*.bitmap.rows));
+                
+                const x_offset = @divTrunc(glyph_pos[i].x_offset, 64);
+                const y_offset = @divTrunc(glyph_pos[i].y_offset, 64);
+                
+                const left = pen_x + glyph_left + x_offset;
+                const right = left + width;
+                const top = glyph_top + y_offset;
+                const bottom = top - height;
+                
+                actual_min_x = @min(actual_min_x, left);
+                actual_max_x = @max(actual_max_x, right);
+                actual_min_y = @min(actual_min_y, bottom);
+                actual_max_y = @max(actual_max_y, top);
+                pen_x += @divTrunc(glyph_pos[i].x_advance, 64);
+            }
+        }
+
+        const actual_width = actual_max_x - actual_min_x;
+        const actual_height = actual_max_y - actual_min_y;
+
+        const bg_width: u32 = @as(u32, @intCast(actual_width));
+        const bg_height: u32 = @as(u32, @intCast(actual_height));
 
         const infos = try context.gpa.alloc(hb.hb_glyph_info_t, glyph_count);
         const positions = try context.gpa.alloc(hb.hb_glyph_position_t, glyph_count);
@@ -73,15 +101,16 @@ pub const TextRenderer = struct {
 
         return Text{
             .glyph_count = glyph_count,
-            .total_width = total_width,
-            .total_height = total_height,
-            .padding = padding,
+            .total_width = actual_width,
+            .total_height = actual_height,
             .infos = infos.ptr,
             .pos = positions.ptr,
             .bg_w = bg_width,
             .bg_h = bg_height,
             .bg = bg,
             .fg = fg,
+            .baseline_offset = actual_max_y,
+            .left_offset = actual_min_x,
         };
     }
 
@@ -93,8 +122,19 @@ pub const TextRenderer = struct {
     }
 
     pub fn renderText(self: *TextRenderer, text: Text, alignment: u32, buffer: *Buffer, context: *Context) void {
-        const bg_x: i64 = @divTrunc(@as(i64, @intCast(buffer.width)) - @as(i64, @intCast(text.bg_w)), 2);
-        const bg_y: i64 = @divTrunc(@as(i64, @intCast(buffer.height)) - @as(i64, @intCast(text.bg_h)), 2);
+        // Default Center
+        var bg_x: i64 = @divTrunc(@as(i64, @intCast(buffer.width)) - @as(i64, @intCast(text.bg_w)), 2);
+        var bg_y: i64 = @divTrunc(@as(i64, @intCast(buffer.height)) - @as(i64, @intCast(text.bg_h)), 2);
+
+        switch (alignment) {
+            1 => { bg_y = 0; },
+            2 => { bg_y = @as(i64, @intCast(buffer.height)) - @as(i64, @intCast(text.bg_h)); },
+            3 => { bg_x = 0; },
+            4 => { bg_x = @as(i64, @intCast(buffer.width)) - @as(i64, @intCast(text.bg_w)); },
+            else => {},
+        }
+
+        std.debug.print("Buff Width: {}\nBuff Height: {}\nBG Width: {}\nBG Height: {}\n", .{ buffer.width, buffer.height, text.bg_w, text.bg_h});
 
         // Draw background
         var y: u32 = 0;
@@ -113,21 +153,11 @@ pub const TextRenderer = struct {
             }
         }
 
-        var text_start_x: i64 = bg_x + @as(i64, @intCast(text.padding));
-        const text_start_y: i64 = bg_y + @as(i64, @intCast(text.padding));
+        const text_start_x: i64 = bg_x;
+        const text_start_y: i64 = bg_y;
 
-        const available_width: i64 = @as(i64, @intCast(text.total_width));
-        if (alignment == 0) { // CENTER
-            text_start_x += @divTrunc(available_width - text.total_width, 2);
-        } else if (alignment == 4) { // RIGHT
-            text_start_x += available_width - text.total_width;
-        }
-
-        const face_size = context.render.ft_face.*.size.*.metrics;
-        const ascender: i64 = @divTrunc(face_size.ascender, 64);
-
-        var pen_x: i64 = text_start_x;
-        var pen_y: i64 = text_start_y + ascender;
+        var pen_x: i64 = text_start_x - text.left_offset;
+        var pen_y: i64 = text_start_y + text.baseline_offset;
 
         // Render each glyph
         for (0..text.glyph_count) |i| {

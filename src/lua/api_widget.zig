@@ -22,6 +22,9 @@ pub fn createWidgetMetatable(L: *Lua) void {
     L.pushFunction(zlua.wrap(luaSetWidgetText));
     L.setField(-2, "set_text");
 
+    L.pushFunction(zlua.wrap(luaSetWidgetEdge));
+    L.setField(-2, "to_edge");
+
     L.setField(-2, "__index");
 
     L.pop(1);
@@ -59,7 +62,27 @@ pub const luaWidget = struct {
             }
         }
     }
+
+    pub fn setEdge(self: *luaWidget, edge: u32) void {
+        for (self.widgets.items) |widget| {
+            switch (widget.*) {
+                .label => {
+                    widget.label.set_edge(edge);
+                }
+            }
+        }
+    }
 };
+
+fn luaSetWidgetEdge(L: *Lua) i32 {
+    const lwid_ptr = L.checkUserdata(*luaWidget, 1, "Widget").*;
+
+    const edge = L.toInteger(2) catch 0; // default CENTER
+
+    lwid_ptr.setEdge(@intCast(edge));
+
+    return 0;
+}
 
 fn luaSetWidgetBg(L: *Lua) i32 {
     const lwid_ptr_ptr = L.checkUserdata(*luaWidget, 1, "Widget");

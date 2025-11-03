@@ -33,18 +33,16 @@ pub const Label = struct {
     alignment: u32,
     callbacks: callbacks.CallbackHandler,
     font_size: u32,
-    padding: u32,
     context: *Context,
 
-    pub fn new(text: []const u8, font_size: u32, padding: u32, fg: u32, bg: u32, alignment: u32, context: *Context) anyerror!Widget{
-        const label_text = TextRenderer.newText(text, font_size, padding, fg, bg, context) catch |err| return err;
+    pub fn new(text: []const u8, font_size: u32, fg: u32, bg: u32, alignment: u32, context: *Context) anyerror!Widget{
+        const label_text = TextRenderer.newText(text, font_size, fg, bg, context) catch |err| return err;
         const label = Label {
             .text = label_text,
             .tr = TextRenderer{},
             .alignment = alignment,
             .callbacks = callbacks.CallbackHandler.init(context.gpa, context.lua),
             .font_size = font_size,
-            .padding = padding,
             .context = context,
         };
 
@@ -63,9 +61,13 @@ pub const Label = struct {
     }
 
     pub fn set_text(self: *Label, text: []const u8) void {
-        const label_text = TextRenderer.newText(text, self.font_size, self.padding, self.text.fg, self.text.bg, self.context) catch return;
+        const label_text = TextRenderer.newText(text, self.font_size, self.text.fg, self.text.bg, self.context) catch return;
 
         self.text = label_text;
+    }
+
+    pub fn set_edge(self: *Label, edge: u32) void {
+        self.alignment = edge;
     }
 
     pub fn render(self: *Label, buffer: *Buffer) void {
