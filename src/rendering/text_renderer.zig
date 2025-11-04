@@ -1,11 +1,11 @@
 const std = @import("std");
 
-const ctx = @import("./context.zig");
+const ctx = @import("../context.zig");
 const Context = ctx.Context;
 const ft = ctx.ft;
 const hb = ctx.hb;
 
-const Buffer = @import("./window.zig").Buffer;
+const Buffer = @import("./buffer.zig").Buffer;
 
 pub const Text = struct {
     glyph_count: u32,

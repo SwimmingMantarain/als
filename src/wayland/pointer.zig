@@ -9,13 +9,13 @@ const seat = wayland.client.seat;
 const window = @import("./window.zig");
 const OutputInfo = window.OutputInfo;
 
-const Context = @import("./context.zig").Context;
+const Context = @import("../context.zig").Context;
 
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
 
-const handleWindowCallback = @import("./lua/callbacks.zig").handleWindowCallback;
-const handleWidgetCallback = @import("./lua/callbacks.zig").handleWidgetCallback;
+const handleWindowCallback = @import("../lua/callbacks.zig").handleWindowCallback;
+const handleWidgetCallback = @import("../lua/callbacks.zig").handleWidgetCallback;
 
 pub fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, context: *Context) void {
     switch (event) {

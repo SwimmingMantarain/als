@@ -2,7 +2,7 @@ const std = @import("std");
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
 const getContext = @import("./bindings.zig").getContext;
-const Window = @import("../window.zig").Window;
+const Window = @import("../wayland/window.zig").Window;
 const luaWindow = @import("./api_window.zig").luaWindow;
 
 pub fn luaCreateWindow(L: *Lua) i32 {

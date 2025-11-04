@@ -8,7 +8,7 @@ const xdg = wayland.client.xdg;
 const zwlr = wayland.client.zwlr;
 const seat = wayland.client.seat;
 
-const window = @import("./window.zig");
+const window = @import("./wayland/window.zig");
 const OutputInfo = window.OutputInfo;
 
 const Context = @import("./context.zig").Context;
@@ -17,8 +17,8 @@ const zlua = @import("zlua");
 const Lua = zlua.Lua;
 const als = @import("./lua/bindings.zig");
 
-const pointerListener = @import("./pointer.zig").pointerListener;
-const keyboardListener = @import("./keyboard.zig").keyboardListener;
+const pointerListener = @import("./wayland/pointer.zig").pointerListener;
+const keyboardListener = @import("./wayland/keyboard.zig").keyboardListener;
 
 pub fn main() anyerror!void {
     const display = try wl.Display.connect(null);

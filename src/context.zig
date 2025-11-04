@@ -8,9 +8,9 @@ const zwlr = wayland.client.zwlr;
 const seat = wayland.client.seat;
 const zlua = @import("zlua");
 
-const window = @import("./window.zig");
+const window = @import("./wayland/window.zig");
 const luaWindow = @import("./lua/api_window.zig").luaWindow;
-const widgets = @import("./widgets.zig");
+const widgets = @import("./widgets/widgets.zig");
 
 pub const xkb = @cImport({
     @cInclude("xkbcommon/xkbcommon.h");

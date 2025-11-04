@@ -1,13 +1,13 @@
 const std = @import("std");
 
-const ft = @import("./context.zig").ft;
-const hb = @import("./context.zig").hb;
+const ft = @import("../context.zig").ft;
+const hb = @import("../context.zig").hb;
 
-const Context = @import("./context.zig").Context;
-const Buffer = @import("./window.zig").Buffer;
-const callbacks = @import("./callbacks.zig");
-const Text = @import("./text_renderer.zig").Text;
-const TextRenderer = @import("./text_renderer.zig").TextRenderer;
+const Context = @import("../context.zig").Context;
+const Buffer = @import("../rendering/buffer.zig").Buffer;
+const callbacks = @import("../wayland/callbacks.zig");
+const Text = @import("../rendering/text_renderer.zig").Text;
+const TextRenderer = @import("../rendering/text_renderer.zig").TextRenderer;
 
 pub const Widget = union(enum) {
     label: Label,

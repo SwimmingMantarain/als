@@ -5,9 +5,9 @@ const Context = @import("../context.zig").Context;
 const getContext = @import("./api_als.zig").getContext;
 const luaWidget = @import("./api_widget.zig").luaWidget;
 const luaWindow = @import("./api_window.zig").luaWindow;
-const window = @import("../window.zig");
-const widgets = @import("../widgets.zig");
-const callbacks = @import("../callbacks.zig");
+const window = @import("../wayland/window.zig");
+const widgets = @import("../widgets/widgets.zig");
+const callbacks = @import("../wayland/callbacks.zig");
 
 pub fn luaSetWidgetCallback(L: *Lua) i32 {
     const widget_ptr = L.checkUserdata(*luaWidget, 1, "Widget").*;

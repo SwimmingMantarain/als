@@ -8,13 +8,15 @@ const wl = wayland.client.wl;
 const xdg = wayland.client.xdg;
 const zwlr = wayland.client.zwlr;
 
-const Context = @import("./context.zig").Context;
-const ft = @import("./context.zig").ft;
-const hb = @import("./context.zig").hb;
+const Context = @import("../context.zig").Context;
+const ft = @import("../context.zig").ft;
+const hb = @import("../context.zig").hb;
 
-const Label = @import("./widgets.zig").Label;
-const Widget = @import("./widgets.zig").Widget;
+const Label = @import("../widgets/widgets.zig").Label;
+const Widget = @import("../widgets/widgets.zig").Widget;
 const callbacks = @import("./callbacks.zig");
+
+const Buffer = @import("../rendering/buffer.zig").Buffer;
 
 pub const OutputInfo = struct {
     output: *wl.Output,
@@ -65,39 +67,7 @@ pub const Monitor = struct {
         const width: u64 = if (w < 0) @as(u64, @intCast(self.output.width)) else @as(u64, @intCast(w));
         const height: u64 = if (h < 0) @as(u64, @intCast(self.output.height)) else @as(u64, @intCast(h));
 
-        const mbuffer = blk: {
-            const stride = width * 4;
-            const size = stride * height;
-
-            const fd = try posix.memfd_create("als-window", 0);
-            try posix.ftruncate(fd, size);
-
-            const data = try posix.mmap(
-                null,
-                size,
-                posix.PROT.READ | posix.PROT.WRITE,
-                .{ .TYPE = .SHARED },
-                fd,
-                0,
-            );
-
-            const pixels: [*]u32 = @ptrCast(@alignCast(data.ptr));
-            const pixel_count = size / 4;
-            @memset(pixels[0..pixel_count], 0xFF000000); // ARGB Black
-
-            const pool = try self.context.wayland.shm.?.createPool(fd, @as(i32, @intCast(size)));
-            defer pool.destroy();
-
-            const buffer = try pool.createBuffer(0, @as(i32, @intCast(width)), @as(i32, @intCast(height)), @as(i32, @intCast(stride)), wl.Shm.Format.argb8888);
-
-            break :blk Buffer{
-                .buffer = buffer,
-                .width = width,
-                .height = height,
-                .pixels = pixels,
-                .pixel_count = pixel_count,
-            };
-        };
+        const mbuffer = try Buffer.new(width, height, self.context);
 
         const surface = try self.context.wayland.compositor.?.createSurface();
 
@@ -167,14 +137,6 @@ pub const Monitor = struct {
     }
 };
 
-pub const Buffer = struct {
-    buffer: *wl.Buffer,
-    width: u64,
-    height: u64,
-    pixels: [*]u32,
-    pixel_count: usize,
-};
-
 pub const Window = struct {
     surface: *wl.Surface,
     layer_surface: *zwlr.LayerSurfaceV1,
@@ -189,20 +151,10 @@ pub const Window = struct {
 
     pub fn deinit(self: *Window, gpa: Allocator) void {
         self.callbacks.deinit();
-
-        const size = self.buffer.width * self.buffer.height * 4;
-        posix.munmap(@as([*]align(std.heap.page_size_min) u8, @ptrCast(@alignCast(self.buffer.pixels)))[0..size]);
         self.layer_surface.destroy();
         self.surface.destroy();
-        self.buffer.buffer.destroy();
-
+        self.buffer.deinit();
         self.widgets.deinit(gpa);
-    }
-
-    pub fn set_pixel(self: *Window, x: u32, y: u32) void {
-        self.buffer.pixels[@as(usize, @intCast(y)) * self.buffer.width + @as(usize, @intCast(x))] = 0xFFFFFFFF; // ARGB White
-        self.surface.attach(self.buffer.buffer, 0, 0);
-        self.surface.commit();
     }
 
     pub fn update(self: *Window) anyerror!void {

@@ -1,8 +1,8 @@
 const std = @import("std");
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
-const window = @import("../window.zig");
-const widgets = @import("../widgets.zig");
+const window = @import("../wayland/window.zig");
+const widgets = @import("../widgets/widgets.zig");
 const luaSetWidgetCallback = @import("./callbacks.zig").luaSetWidgetCallback;
 
 pub fn createWidgetMetatable(L: *Lua) void {

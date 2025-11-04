@@ -1,8 +1,8 @@
 const std = @import("std");
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
-const window = @import("../window.zig");
-const widgets = @import("../widgets.zig");
+const window = @import("../wayland/window.zig");
+const widgets = @import("../widgets/widgets.zig");
 const getContext = @import("./bindings.zig").getContext;
 const Context = @import("../context.zig").Context;
 const luaWidget = @import("./api_widget.zig").luaWidget;
@@ -21,9 +21,6 @@ pub fn createWindowMetatable(L: *Lua) void {
 
     L.pushFunction(zlua.wrap(luaWindowNewLabel));
     L.setField(-2, "new_label");
-
-    L.pushFunction(zlua.wrap(luaWindowSetPixel));
-    L.setField(-2, "set_pixel"); // debug purposes only
 
     L.setField(-2, "__index");
 
@@ -61,27 +58,7 @@ pub const luaWindow = struct {
             .widgets = labels,
         };
     }
-
-    pub fn set_pixel(self: *luaWindow, x: u32, y: u32) void {
-        var wins = self.context.monitors.get_windows(self.id, self.context) catch return;
-        defer wins.deinit(self.context.gpa);
-
-        for (wins.items) |w| {
-            w.set_pixel(x, y);
-        }
-    }
 };
-
-fn luaWindowSetPixel(L: *Lua) i32 {
-    const lwin_ptr = L.checkUserdata(*luaWindow, 1, "Window").*;
-
-    const x = L.toInteger(2) catch 0;
-    const y = L.toInteger(3) catch 0;
-
-    lwin_ptr.set_pixel(@intCast(x), @intCast(y));
-
-    return 0;
-}
 
 fn luaSetWindowEdge(L: *Lua) i32 {
     const lwin_ptr_ptr = L.checkUserdata(*luaWindow, 1, "Window");

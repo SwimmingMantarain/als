@@ -10,14 +10,14 @@ const seat = wayland.client.seat;
 const window = @import("./window.zig");
 const OutputInfo = window.OutputInfo;
 
-const Context = @import("./context.zig").Context;
+const Context = @import("../context.zig").Context;
 
 const zlua = @import("zlua");
 const Lua = zlua.Lua;
 
-const xkb = @import("./context.zig").xkb;
+const xkb = @import("../context.zig").xkb;
 
-const handleWindowCallback = @import("./lua/callbacks.zig").handleWindowCallback;
+const handleWindowCallback = @import("../lua/callbacks.zig").handleWindowCallback;
 
 pub fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, context: *Context) void {
     switch (event) {
