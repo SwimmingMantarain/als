@@ -148,6 +148,11 @@ pub const Monitor = struct {
             .dirty = true,
         };
 
+        errdefer {
+            win_ptr.deinit(self.context.gpa);
+            self.context.gpa.destroy(win_ptr);
+        }
+
         try self.windows.append(self.context.gpa, win_ptr);
 
         return win_ptr;

@@ -40,16 +40,16 @@ pub const luaWindow = struct {
             return;
         };
 
+        defer wins.deinit(self.context.gpa);
+
         for (wins.items) |w| {
             w.toEdge(edge);
         }
-
-        // no losin' :)
-        wins.deinit(self.context.gpa);
     }
 
     pub fn newLabel(self: *luaWindow, text: []const u8, font_size: u32) anyerror!luaWidget {
-        const wins = try self.context.monitors.get_windows(self.id, self.context);
+        var wins = try self.context.monitors.get_windows(self.id, self.context);
+        defer wins.deinit(self.context.gpa);
         var labels = try std.ArrayList(*widgets.Widget).initCapacity(self.context.gpa, wins.items.len);
 
         for (wins.items) |w| {
@@ -63,7 +63,8 @@ pub const luaWindow = struct {
     }
 
     pub fn set_pixel(self: *luaWindow, x: u32, y: u32) void {
-        const wins = self.context.monitors.get_windows(self.id, self.context) catch return;
+        var wins = self.context.monitors.get_windows(self.id, self.context) catch return;
+        defer wins.deinit(self.context.gpa);
 
         for (wins.items) |w| {
             w.set_pixel(x, y);
