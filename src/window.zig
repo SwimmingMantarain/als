@@ -1,5 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
+const Allocator = mem.Allocator;
 const posix = std.posix;
 
 const wayland = @import("wayland");
@@ -12,22 +13,161 @@ const ft = @import("./context.zig").ft;
 const hb = @import("./context.zig").hb;
 
 const Label = @import("./widgets.zig").Label;
-const WidgetBuffer = @import("./widgets.zig").WidgetBuffer;
+const Widget = @import("./widgets.zig").Widget;
+const callbacks = @import("./callbacks.zig");
 
 pub const OutputInfo = struct {
     output: *wl.Output,
+    context: *Context,
     width: i32 = 0,
     height: i32 = 0,
+    scale: i32 = 1,
+    name: []u8 = &[_]u8{},
     ready: bool = false,
 };
 
 pub const Monitor = struct {
-    surface: *wl.Surface,
-    layer_surface: *zwlr.LayerSurfaceV1,
-    buffer: Buffer,
+    output: OutputInfo,
+    context: *Context,
+    id: u32,
+    windows: std.ArrayList(*Window),
+
+    pub fn new(output: OutputInfo, id: u32, context: *Context) anyerror!Monitor {
+        const monitor = Monitor{
+            .output = output,
+            .context = context,
+            .id = id,
+            .windows = try std.ArrayList(*Window).initCapacity(context.gpa, 5),
+        };
+
+        return monitor;
+    }
+
+    pub fn deinit(self: *Monitor) void {
+        for (self.windows.items) |window| {
+            window.deinit(self.context.gpa);
+            self.context.gpa.destroy(window);
+        }
+        self.windows.deinit(self.context.gpa);
+    }
+
+    pub fn update(self: *Monitor, display: *wl.Display) anyerror!void {
+        if (display.flush() != .SUCCESS) return error.FlushFailed;
+        for (self.windows.items) |window| {
+            try window.update();
+        }
+    }
+
+    pub fn new_window(self: *Monitor, w: i64, h: i64, id: u32) anyerror!*Window {
+        const widgets = try std.ArrayList(*Widget).initCapacity(self.context.gpa, 10);
+
+        // Check if we want to be as wide or tall as the screen
+        const width: u64 = if (w < 0) @as(u64, @intCast(self.output.width)) else @as(u64, @intCast(w));
+        const height: u64 = if (h < 0) @as(u64, @intCast(self.output.height)) else @as(u64, @intCast(h));
+
+        const mbuffer = blk: {
+            const stride = width * 4;
+            const size = stride * height;
+
+            const fd = try posix.memfd_create("als-window", 0);
+            try posix.ftruncate(fd, size);
+
+            const data = try posix.mmap(
+                null,
+                size,
+                posix.PROT.READ | posix.PROT.WRITE,
+                .{ .TYPE = .SHARED },
+                fd,
+                0,
+            );
+
+            const pixels: [*]u32 = @ptrCast(@alignCast(data.ptr));
+            const pixel_count = size / 4;
+            @memset(pixels[0..pixel_count], 0xFF000000); // ARGB Black
+
+            const pool = try self.context.wayland.shm.?.createPool(fd, @as(i32, @intCast(size)));
+            defer pool.destroy();
+
+            const buffer = try pool.createBuffer(0, @as(i32, @intCast(width)), @as(i32, @intCast(height)), @as(i32, @intCast(stride)), wl.Shm.Format.argb8888);
+
+            break :blk Buffer{
+                .buffer = buffer,
+                .width = width,
+                .height = height,
+                .pixels = pixels,
+                .pixel_count = pixel_count,
+            };
+        };
+
+        const surface = try self.context.wayland.compositor.?.createSurface();
+
+        surface.setBufferScale(self.output.scale);
+
+        const region = try self.context.wayland.compositor.?.createRegion();
+        region.add(0, 0, @intCast(width), @intCast(height));
+        surface.setInputRegion(region);
+        region.destroy();
+
+        const layer_surface = try self.context.wayland.layer_shell.?.getLayerSurface(surface, self.output.output, zwlr.LayerShellV1.Layer.overlay, "cat");
+        const logical_width = @divTrunc(self.output.width, self.output.scale);
+        const logical_height = @divTrunc(self.output.height, self.output.scale);
+
+        layer_surface.setSize(@intCast(logical_width), @intCast(logical_height));
+        layer_surface.setExclusiveZone(@intCast(height));
+        layer_surface.setAnchor(.{
+            .bottom = true,
+            .left = true,
+            .right = true,
+            .top = true,
+        });
+
+        layer_surface.setKeyboardInteractivity(.on_demand);
+
+        var configured = false;
+        layer_surface.setListener(*bool, layerSurfaceListener, &configured);
+        surface.commit();
+
+        while (!configured) {
+            if (self.context.wayland.display.dispatch() != .SUCCESS) return error.DisplayDispatchFailed;
+        }
+
+        surface.attach(mbuffer.buffer, 0, 0);
+        surface.commit();
+
+        const win_ptr = try self.context.gpa.create(Window);
+        win_ptr.* = Window{
+            .surface = surface,
+            .layer_surface = layer_surface,
+            .buffer = mbuffer,
+            .bg_color = 0xFF000000,
+            .widgets = widgets,
+            .active_widget = null,
+            .callbacks = callbacks.CallbackHandler.init(self.context.gpa, self.context.lua),
+            .context = self.context,
+            .id = id,
+            .dirty = true,
+        };
+
+        errdefer {
+            win_ptr.deinit(self.context.gpa);
+            self.context.gpa.destroy(win_ptr);
+        }
+
+        try self.windows.append(self.context.gpa, win_ptr);
+
+        return win_ptr;
+    }
+
+    pub fn get_window(self: *Monitor, id: u32) ?*Window {
+        for (self.windows.items) |w| {
+            if (w.id == id) return w;
+        }
+
+        return null;
+    }
 };
 
-const Buffer = struct {
+pub const Buffer = struct {
     buffer: *wl.Buffer,
     width: u64,
     height: u64,
@@ -35,199 +175,105 @@ const Buffer = struct {
     pixel_count: usize,
 };
 
-pub const Callbacks = struct {
-    leftpress: ?i32,
-    leftrelease: ?i32,
-    mouseenter: ?i32,
-    mouseleave: ?i32,
-    mousemotion: ?i32,
-    key: ?i32,
-};
-
 pub const Window = struct {
-    monitors: std.ArrayList(Monitor),
+    surface: *wl.Surface,
+    layer_surface: *zwlr.LayerSurfaceV1,
+    buffer: Buffer,
+    widgets: std.ArrayList(*Widget),
+    active_widget: ?*Widget,
     bg_color: u32,
-    callbacks: Callbacks,
+    callbacks: callbacks.CallbackHandler,
     context: *Context,
-    redraw: bool,
+    id: u32,
+    dirty: bool,
 
-    pub fn init(
-        window_name: []const u8,
-        w: i64,
-        h: i64,
-        bg_color: u32,
-        context: *Context,
-        outputs: []OutputInfo,
-    ) !Window {
-        var monitors =  try std.ArrayList(Monitor).initCapacity(context.allocator, 5);
+    pub fn deinit(self: *Window, gpa: Allocator) void {
+        self.callbacks.deinit();
 
-        for (outputs) |out_info| {
-            // Check if we want to be as wide or tall as the screen
-            const width: u64 = if (w < 0) @as(u64, @intCast(out_info.width)) else @as(u64, @intCast(w));
-            const height: u64 = if (h < 0) @as(u64, @intCast(out_info.height)) else @as(u64, @intCast(h));
+        const size = self.buffer.width * self.buffer.height * 4;
+        posix.munmap(@as([*]align(std.heap.page_size_min) u8, @ptrCast(@alignCast(self.buffer.pixels)))[0..size]);
+        self.layer_surface.destroy();
+        self.surface.destroy();
+        self.buffer.buffer.destroy();
 
-            const mbuffer = blk: {
-                const stride = width * 4;
-                const size = stride * height;
-
-                const fd = try posix.memfd_create(window_name, 0);
-                try posix.ftruncate(fd, size);
-
-                const data = try posix.mmap(
-                    null,
-                    size,
-                    posix.PROT.READ | posix.PROT.WRITE,
-                    .{ .TYPE = .SHARED },
-                    fd,
-                    0,
-                );
-
-                const pixels: [*]u32 = @ptrCast(@alignCast(data.ptr));
-                const pixel_count = size / 4;
-                @memset(pixels[0..pixel_count], bg_color); // ARGB
-
-                const pool = try context.shm.?.createPool(fd, @as(i32, @intCast(size)));
-                defer pool.destroy();
-
-                const buffer = try pool.createBuffer(
-                    0,
-                    @as(i32, @intCast(width)),
-                    @as(i32, @intCast(height)),
-                    @as(i32, @intCast(stride)),
-                    wl.Shm.Format.argb8888
-                );
-
-                break :blk Buffer {
-                    .buffer = buffer,
-                    .width = width,
-                    .height = height,
-                    .pixels = pixels,
-                    .pixel_count = pixel_count,
-                };
-            };
-
-            const surface = try context.compositor.?.createSurface();
-
-            const region = try context.compositor.?.createRegion();
-            region.add(0, 0, @intCast(width), @intCast(height));
-            surface.setInputRegion(region);
-            region.destroy();
-
-            const layer_surface = try context.layer_shell.?.getLayerSurface(
-                surface,
-                out_info.output,
-                zwlr.LayerShellV1.Layer.overlay,
-                "cat"
-            );
-
-            layer_surface.setSize(@intCast(width), @intCast(height));
-            layer_surface.setExclusiveZone(@intCast(height));
-            layer_surface.setAnchor(.{
-                .bottom = true,
-                .left = true,
-                .right = true,
-                .top = true,
-            });
-
-            layer_surface.setKeyboardInteractivity(.on_demand);
-
-            var configured = false;
-            layer_surface.setListener(*bool, layerSurfaceListener, &configured);
-            surface.commit();
-
-            while (!configured) {
-                if (context.display.dispatch() != .SUCCESS) return error.DispatchFailed;
-            }
-
-            surface.attach(mbuffer.buffer, 0, 0);
-            surface.commit();
-
-            const mon = Monitor {
-                .surface = surface,
-                .layer_surface = layer_surface,
-                .buffer = mbuffer,
-            };
-
-            monitors.append(context.allocator, mon) catch {
-                std.debug.print("Failed to append monitor\n", .{});
-            };
-        }
-
-        const callbacks = Callbacks{
-            .leftpress = null,
-            .leftrelease = null,
-            .mouseenter = null,
-            .mouseleave = null,
-            .mousemotion = null,
-            .key = null,
-        };
-
-        return Window{
-            .monitors = monitors,
-            .bg_color = bg_color,
-            .callbacks = callbacks,
-            .context = context,
-            .redraw = true,
-        };
+        self.widgets.deinit(gpa);
     }
 
-    pub fn deinit(self: *Window) void {
-        for (self.monitors.items) |*monitor| {
-            monitor.layer_surface.destroy();
-            monitor.surface.destroy();
-            monitor.buffer.buffer.destroy();
-        }
+    pub fn set_pixel(self: *Window, x: u32, y: u32) void {
+        self.buffer.pixels[@as(usize, @intCast(y)) * self.buffer.width + @as(usize, @intCast(x))] = 0xFFFFFFFF; // ARGB White
+        self.surface.attach(self.buffer.buffer, 0, 0);
+        self.surface.commit();
     }
 
-    pub fn update(self: *Window, display: *wl.Display, context: *Context) anyerror!void {
-        if (display.flush() != .SUCCESS) return error.FlushFailed;
-
-        if (self.redraw) {
-            self.redraw = false;
+    pub fn update(self: *Window) anyerror!void {
+        if (self.dirty) {
+            self.dirty = false;
             self.clear();
-
-            for (self.monitors.items) |*monitor| {
-                for (context.widgets.items) |*widget| {
-                    widget.render(monitor, context);
-                }
-                monitor.surface.attach(monitor.buffer.buffer, 0, 0);
-                monitor.surface.commit();
-            }
         }
+
+        for (self.widgets.items) |widget| {
+            widget.render(&self.buffer);
+        }
+
+        self.surface.attach(self.buffer.buffer, 0, 0);
+        self.surface.commit();
     }
 
-    pub fn newLabel(_: *Window, text: []const u8, font_size: u32, padding: u32, alignment: u32) Label {
-        const label = Label{
-            .text = text,
-            .font_size = font_size,
-            .alignment = alignment,
-            .padding = padding,
-            .bg_color = 0xFF119911,
-            .fg_color = 0xFFFFFFFF,
-        };
+    pub fn mouseEnterWidget(self: *Window, x: f64, y: f64) ?*Widget {
+        for (self.widgets.items) |widget| {
+            if (widget.contains(x, y, &self.buffer) and self.active_widget == null) {
+                self.active_widget = widget;
+                return widget;
+            } 
+        }
 
-        return label;
+        return null;
+    }
+
+    pub fn mouseLeaveWidget(self: *Window, x: f64, y: f64) ?*Widget {
+        for (self.widgets.items) |widget| {
+            if (!widget.contains(x, y, &self.buffer) and self.active_widget == widget) {
+                self.active_widget = null;
+                return widget;
+            }
+        }
+
+        return null;
+    }
+
+    pub fn newLabel(self: *Window, text: []const u8, font_size: u32) anyerror!*Widget {
+        const label = Label.new(
+            text,
+            font_size,
+            0xFFFFFFFF, // foreground
+            0xFF119911, // background
+            0, // Default CENTER
+            self.context,
+        ) catch |err| return err;
+
+        const label_ptr = try self.context.gpa.create(Widget);
+        label_ptr.* = label;
+
+        try self.widgets.append(self.context.gpa, label_ptr);
+
+        return label_ptr;
     }
 
     pub fn toEdge(self: *Window, edge: i32) void {
-        for (self.monitors.items) |*monitor| {
-            monitor.layer_surface.setAnchor(.{
-                .bottom = if (edge == 2 or edge == 0) true else false,
-                .left = if (edge == 3 or edge == 0) true else false,
-                .right = if (edge == 4 or edge == 0) true else false,
-                .top = if (edge == 1 or edge == 0) true else false,
-            });
+        self.layer_surface.setAnchor(.{
+            .bottom = if (edge == 2 or edge == 0) true else false,
+            .left = if (edge == 3 or edge == 0) true else false,
+            .right = if (edge == 4 or edge == 0) true else false,
+            .top = if (edge == 1 or edge == 0) true else false,
+        });
 
-            monitor.surface.commit();
-        }
+        self.surface.commit();
     }
 
     pub fn clear(self: *Window) void {
-        for (self.monitors.items) |*monitor| {
-            const pixels = monitor.buffer.pixels;
-            const pixel_count = monitor.buffer.pixel_count;
-            @memset(pixels[0..pixel_count], self.bg_color);
-        }
+        const pixels = self.buffer.pixels;
+        const pixel_count = self.buffer.pixel_count;
+        @memset(pixels[0..pixel_count], self.bg_color);
     }
 };
 

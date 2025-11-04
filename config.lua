@@ -1,4 +1,5 @@
-local win = als.create_window(SCREEN_WIDTH, 50, 0xcc000000, true) -- width, height, bg color, onAllMonitors
+local win = als.create_window(SCREEN_WIDTH, 50, "all") -- width, height, Name of monitor (e.g. DP-1, or All monitors)
 win:to_edge(UP)
 
-local label = win:new_label("label", 36, 4, CENTER) -- text, width, height, font size, padding, alignment
+local label = win:new_label("text", 36)
+label:to_edge(RIGHT)
