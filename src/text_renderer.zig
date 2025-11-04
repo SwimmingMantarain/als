@@ -134,8 +134,6 @@ pub const TextRenderer = struct {
             else => {},
         }
 
-        std.debug.print("Buff Width: {}\nBuff Height: {}\nBG Width: {}\nBG Height: {}\n", .{ buffer.width, buffer.height, text.bg_w, text.bg_h});
-
         // Draw background
         var y: u32 = 0;
         while (y < text.bg_h) : (y += 1) {

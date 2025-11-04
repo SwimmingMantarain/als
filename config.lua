@@ -2,4 +2,4 @@ local win = als.create_window(SCREEN_WIDTH, 50, "all") -- width, height, Name of
 win:to_edge(UP)
 
 local label = win:new_label("text", 36)
-label:to_edge(LEFT)
+label:to_edge(RIGHT)
